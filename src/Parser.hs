@@ -15,6 +15,11 @@ data Expr = Var String
   | Call Expr Expr
   deriving(Show)
 
+data Function = Function { fun_name :: String
+                         , fun_args :: [(String, Expr)]
+                         , fun_body :: Expr
+                         } deriving(Show)
+
 -- Lexer
 languageDef =
   emptyDef { Token.commentStart    = "/*"
@@ -26,6 +31,7 @@ languageDef =
                                      , "in"
                                      , "true"
                                      , "false"
+                                     , "fun"
                                      ]
            , Token.reservedOpNames = ["+", "-", "*", "/", ":="
                                      , "<", ">"
@@ -40,6 +46,7 @@ reserved   = Token.reserved   lexer
 reservedOp = Token.reservedOp lexer
 parens     = Token.parens     lexer
 integer    = Token.integer    lexer
+semicolon  = Token.semi       lexer
 whiteSpace = Token.whiteSpace lexer
 
 -- Parse assignments
@@ -48,9 +55,9 @@ assignParser =
   do reserved "let"
      var <- identifier
      reservedOp ":="
-     expr <- expr0Parser
+     expr <- exprParser
      reserved "in"
-     body <- expr0Parser
+     body <- exprParser
      return $ Assign var expr body
 
 callParser :: Parser Expr
@@ -58,14 +65,14 @@ callParser = do fun <- expr2Parser
                 arg <- expr1Parser
                 return $ Call fun arg
 
--- Parse booleans
 boolParser :: Parser Bool
 boolParser = (reserved "true" >> return True)
              <|> (reserved "false" >> return False)
 
 -- Parse expressions with precedence 2
 expr2Parser :: Parser Expr
-expr2Parser = liftM Var identifier
+expr2Parser = parens exprParser
+              <|> liftM Var identifier
               <|> liftM IntConst integer
               <|> liftM BoolConst boolParser
 
@@ -75,17 +82,32 @@ expr1Parser = try callParser
               <|> expr2Parser
 
 -- Parse expressions with precedence 0
-expr0Parser :: Parser Expr
-expr0Parser = assignParser <|>
-              expr1Parser
+exprParser :: Parser Expr
+exprParser = assignParser <|>
+             expr1Parser
 
--- Parser that exclude whitespaces
-parser :: Parser Expr
-parser = whiteSpace >> expr0Parser
+-- Parse a variable that has a type
+typedVarParser :: Parser (String, Expr)
+typedVarParser = parens (do name <- identifier
+                            reservedOp ":"
+                            typ <- exprParser
+                            return (name, typ))
+
+functionParser :: Parser Function
+functionParser = do reserved "fun"
+                    name <- identifier
+                    args <- (many typedVarParser)
+                    reservedOp ":="
+                    body <- exprParser
+                    return $ Function name args body
+
+-- Main parser
+programParser :: Parser [Function]
+programParser = whiteSpace >> many functionParser
 
 -- Parse a file
-parseFile :: String -> IO Expr
+parseFile :: String -> IO [Function]
 parseFile file = do program <- readFile file
-                    case parse parser "" program of
+                    case parse programParser "" program of
                       Left e -> print e >> fail "parse error"
                       Right r -> return r

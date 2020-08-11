@@ -1,1 +1,6 @@
-let a := 3 in plus a 2
+fun f1 (a: bool) (b: bool) (c: bool) :=
+    let ab := and a b in
+    or c ab
+
+fun f2 (a: bool) :=
+    f1 a (not a) (not (not a))
