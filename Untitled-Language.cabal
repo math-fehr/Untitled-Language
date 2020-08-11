@@ -21,7 +21,7 @@ executable Untitled-Language
   main-is:             Main.hs
   other-modules:       Parser
   -- other-extensions:
-  build-depends:       base >=4.12 && <4.13
+  build-depends:       base >=4.14 && <4.15
                        , parsec >= 3.1 && < 3.2
   hs-source-dirs:      src
   default-language:    Haskell2010
