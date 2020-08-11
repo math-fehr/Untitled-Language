@@ -63,17 +63,18 @@ boolParser :: Parser Bool
 boolParser = (reserved "true" >> return True)
              <|> (reserved "false" >> return False)
 
+-- Parse expressions with precedence 2
 expr2Parser :: Parser Expr
 expr2Parser = liftM Var identifier
               <|> liftM IntConst integer
               <|> liftM BoolConst boolParser
 
--- Parse expressions
+-- Parse expressions with precedence 1
 expr1Parser :: Parser Expr
 expr1Parser = try callParser
               <|> expr2Parser
 
--- Parse expressions
+-- Parse expressions with precedence 0
 expr0Parser :: Parser Expr
 expr0Parser = assignParser <|>
               expr1Parser
