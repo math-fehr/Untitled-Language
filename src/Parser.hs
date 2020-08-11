@@ -1,9 +1,9 @@
 module Parser where
 
-import System.IO
+import System.IO()
 import Control.Monad
 import Text.ParserCombinators.Parsec
-import Text.ParserCombinators.Parsec.Expr
+import Text.ParserCombinators.Parsec.Expr()
 import Text.ParserCombinators.Parsec.Language
 import qualified Text.ParserCombinators.Parsec.Token as Token
 
@@ -12,6 +12,7 @@ data Expr = Var String
   | IntConst Integer
   | BoolConst Bool
   | Assign String Expr Expr
+  | Call Expr Expr
   deriving(Show)
 
 -- Lexer
@@ -47,26 +48,39 @@ assignParser =
   do reserved "let"
      var <- identifier
      reservedOp ":="
-     expr <- exprParser
+     expr <- expr0Parser
      reserved "in"
-     body <- exprParser
+     body <- expr0Parser
      return $ Assign var expr body
+
+callParser :: Parser Expr
+callParser = do fun <- expr2Parser
+                arg <- expr1Parser
+                return $ Call fun arg
 
 -- Parse booleans
 boolParser :: Parser Bool
 boolParser = (reserved "true" >> return True)
              <|> (reserved "false" >> return False)
 
--- Parse expressiosn
-exprParser :: Parser Expr
-exprParser = assignParser
-             <|> liftM Var identifier
-             <|> liftM IntConst integer
-             <|> liftM BoolConst boolParser
+expr2Parser :: Parser Expr
+expr2Parser = liftM Var identifier
+              <|> liftM IntConst integer
+              <|> liftM BoolConst boolParser
 
--- Parser that exclude whitespaces             
+-- Parse expressions
+expr1Parser :: Parser Expr
+expr1Parser = try callParser
+              <|> expr2Parser
+
+-- Parse expressions
+expr0Parser :: Parser Expr
+expr0Parser = assignParser <|>
+              expr1Parser
+
+-- Parser that exclude whitespaces
 parser :: Parser Expr
-parser = whiteSpace >> exprParser
+parser = whiteSpace >> expr0Parser
 
 -- Parse a file
 parseFile :: String -> IO Expr
