@@ -8,18 +8,20 @@ import Text.ParserCombinators.Parsec.Language
 import qualified Text.ParserCombinators.Parsec.Token as Token
 
 -- Parsed AST
-data Expr = Var String
-  | IntConst Integer
+data Expr =
+  Var String
+  | IntConst Int
   | BoolConst Bool
   | Assign String Expr Expr
   | Call Expr Expr
   deriving(Show)
 
-data Function = Function { fun_name :: String
-                         , fun_args :: [(String, Expr)]
-                         , fun_body :: Expr
-                         , fun_type :: Expr
-                         } deriving(Show)
+data PFunction = PFunction
+  { pfun_name :: String
+  , pfun_args :: [(String, Expr)]
+  , pfun_body :: Expr
+  , pwfun_type :: Expr
+  } deriving(Show)
 
 -- Lexer
 languageDef =
@@ -74,7 +76,7 @@ boolParser = (reserved "true" >> return True)
 expr2Parser :: Parser Expr
 expr2Parser = parens exprParser
               <|> liftM Var identifier
-              <|> liftM IntConst integer
+              <|> liftM (\x -> IntConst $ fromInteger x) integer
               <|> liftM BoolConst boolParser
 
 -- Parse expressions with precedence 1
@@ -94,7 +96,7 @@ typedVarParser = parens (do name <- identifier
                             typ <- exprParser
                             return (name, typ))
 
-functionParser :: Parser Function
+functionParser :: Parser PFunction
 functionParser = do reserved "fun"
                     name <- identifier
                     args <- (many typedVarParser)
@@ -102,15 +104,17 @@ functionParser = do reserved "fun"
                     typ <- exprParser
                     reservedOp ":="
                     body <- exprParser
-                    return $ Function name args body typ
+                    return $ PFunction name args body typ
 
 -- Main parser
-programParser :: Parser [Function]
+programParser :: Parser [PFunction]
 programParser = whiteSpace >> many functionParser
 
 -- Parse a file
-parseFile :: String -> IO [Function]
+parseFile :: String -> IO [PFunction]
 parseFile file = do program <- readFile file
                     case parse programParser "" program of
                       Left e -> print e >> fail "parse error"
                       Right r -> return r
+
+
