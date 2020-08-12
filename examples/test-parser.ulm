@@ -1,6 +1,6 @@
-fun f1 (a: bool) (b: bool) (c: bool) :=
+fun f1 (a: bool) (b: bool) (c: bool) : bool :=
     let ab := and a b in
     or c ab
 
-fun f2 (a: bool) :=
+fun f2 (a: bool) : bool :=
     f1 a (not a) (not (not a))
