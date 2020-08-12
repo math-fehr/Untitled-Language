@@ -18,6 +18,7 @@ data Expr = Var String
 data Function = Function { fun_name :: String
                          , fun_args :: [(String, Expr)]
                          , fun_body :: Expr
+                         , fun_type :: Expr
                          } deriving(Show)
 
 -- Lexer
@@ -97,9 +98,11 @@ functionParser :: Parser Function
 functionParser = do reserved "fun"
                     name <- identifier
                     args <- (many typedVarParser)
+                    reservedOp ":"
+                    typ <- exprParser
                     reservedOp ":="
                     body <- exprParser
-                    return $ Function name args body
+                    return $ Function name args body typ
 
 -- Main parser
 programParser :: Parser [Function]
