@@ -18,7 +18,7 @@ data Expr =
   | Arrow Expr Expr
   deriving(Show)
 
-data PFunction = PFunction
+data PDefinition = PDefinition
   { pfun_name :: String
   , pfun_args :: [(String, Expr)]
   , pfun_body :: Expr
@@ -121,22 +121,22 @@ typedVarParser = parens (do name <- identifier
                             typ <- exprParser
                             return (name, typ))
 
-functionParser :: Parser PFunction
-functionParser = do reserved "fun"
-                    name <- identifier
-                    args <- (many typedVarParser)
-                    reservedOp ":"
-                    typ <- exprParser
-                    reservedOp ":="
-                    body <- exprParser
-                    return $ PFunction name args body typ
+definitionParser :: Parser PDefinition
+definitionParser = do reserved "fun"
+                      name <- identifier
+                      args <- (many typedVarParser)
+                      reservedOp ":"
+                      typ <- exprParser
+                      reservedOp ":="
+                      body <- exprParser
+                      return $ PDefinition name args body typ
 
 -- Main parser
-programParser :: Parser [PFunction]
-programParser = whiteSpace >> many functionParser
+programParser :: Parser [PDefinition]
+programParser = whiteSpace >> many definitionParser
 
 -- Parse a file
-parseFile :: String -> IO [PFunction]
+parseFile :: String -> IO [PDefinition]
 parseFile file = do program <- readFile file
                     case parse programParser "" program of
                       Left e -> print e >> fail "parse error"

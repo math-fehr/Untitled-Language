@@ -12,11 +12,11 @@ data Expr =
   | Arrow Expr Expr
   deriving(Show)
 
-data Function =
-  Function { fun_name :: String
+data Definition =
+  Definition { fun_name :: String
            , fun_args :: [(String, Expr)] -- Names for debug purposes
            , fun_type :: Expr
            , fun_body :: Expr
            } deriving(Show)
 
-data Program = Map String Function
+data Program = Map String Definition
