@@ -1,5 +1,7 @@
 module IR where
 
+import Data.Map (Map)
+
 data Expr =
   LocalVar String Int -- De Bruijn index, and name for debug purposes
   | Def String -- Definition
@@ -19,4 +21,4 @@ data Definition =
            , fun_body :: Expr
            } deriving(Show)
 
-data Program = Map String Definition
+type Program = Map String Definition

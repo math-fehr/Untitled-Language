@@ -4,6 +4,9 @@ fun not (a: bool) : bool :=
 fun and (a: bool) (b: bool) : bool :=
     if a then b else false
 
+fun or (a: bool) (b: bool) : bool :=
+    if a then true else b
+
 fun applytwice (f: bool -> bool) (b: bool) : bool :=
     f (f b)
 
