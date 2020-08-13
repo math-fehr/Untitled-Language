@@ -1,3 +1,9 @@
+fun not (a: bool) : bool :=
+    if a then false else true
+
+fun and (a: bool) (b: bool) : bool :=
+    if a then b else false
+
 fun f1 (a: bool) (b: bool) (c: bool) : bool :=
     let ab := and a b in
     or c ab

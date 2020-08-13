@@ -30,6 +30,7 @@ exprToIr (Parser.IntConst i) _ = IR.IntConst i
 exprToIr (Parser.BoolConst b) _ = IR.BoolConst b
 exprToIr (Parser.Assign s expr body) ctx = IR.Assign s (exprToIr expr ctx) (exprToIr body (addVar s ctx))
 exprToIr (Parser.Call fun arg) ctx = IR.Call (exprToIr fun ctx) (exprToIr arg ctx)
+exprToIr (Parser.IfThenElse c e1 e2) ctx = IR.IfThenElse (exprToIr c ctx) (exprToIr e1 ctx) (exprToIr e2 ctx)
 
 -- Transform a parsed function to an IR function
 funToIr :: PFunction -> Function

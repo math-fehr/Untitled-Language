@@ -14,6 +14,7 @@ data Expr =
   | BoolConst Bool
   | Assign String Expr Expr
   | Call Expr Expr
+  | IfThenElse Expr Expr Expr
   deriving(Show)
 
 data PFunction = PFunction
@@ -35,6 +36,9 @@ languageDef =
                                      , "true"
                                      , "false"
                                      , "fun"
+                                     , "if"
+                                     , "then"
+                                     , "else"
                                      ]
            , Token.reservedOpNames = ["+", "-", "*", "/", ":="
                                      , "<", ">"
@@ -72,6 +76,15 @@ boolParser :: Parser Bool
 boolParser = (reserved "true" >> return True)
              <|> (reserved "false" >> return False)
 
+ifParser :: Parser Expr
+ifParser = do reserved "if"
+              cond <- exprParser
+              reserved "then"
+              trueCase <- exprParser
+              reserved "else"
+              falseCase <- exprParser
+              return $ IfThenElse cond trueCase falseCase
+
 -- Parse expressions with precedence 2
 expr2Parser :: Parser Expr
 expr2Parser = parens exprParser
@@ -86,7 +99,8 @@ expr1Parser = try callParser
 
 -- Parse expressions with precedence 0
 exprParser :: Parser Expr
-exprParser = assignParser <|>
+exprParser = ifParser <|>
+             assignParser <|>
              expr1Parser
 
 -- Parse a variable that has a type

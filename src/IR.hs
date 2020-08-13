@@ -7,6 +7,7 @@ data Expr =
   | BoolConst Bool
   | PrimitiveType String -- String representation of a primitive type
   | Assign String Expr Expr -- Name for debug purposes
+  | IfThenElse Expr Expr Expr
   | Call Expr Expr
   deriving(Show)
 
@@ -16,3 +17,5 @@ data Function =
            , fun_type :: Expr
            , fun_body :: Expr
            } deriving(Show)
+
+data Program = Map String Function
