@@ -3,7 +3,7 @@ module Parser where
 import System.IO()
 import Control.Monad
 import Text.ParserCombinators.Parsec
-import Text.ParserCombinators.Parsec.Expr()
+import Text.ParserCombinators.Parsec.Expr
 import Text.ParserCombinators.Parsec.Language
 import qualified Text.ParserCombinators.Parsec.Token as Token
 
@@ -15,6 +15,7 @@ data Expr =
   | Assign String Expr Expr
   | Call Expr Expr
   | IfThenElse Expr Expr Expr
+  | Arrow Expr Expr
   deriving(Show)
 
 data PFunction = PFunction
@@ -41,7 +42,7 @@ languageDef =
                                      , "else"
                                      ]
            , Token.reservedOpNames = ["+", "-", "*", "/", ":="
-                                     , "<", ">"
+                                     , "<", ">", "->"
                                      ]
            }
 
@@ -85,12 +86,22 @@ ifParser = do reserved "if"
               falseCase <- exprParser
               return $ IfThenElse cond trueCase falseCase
 
--- Parse expressions with precedence 2
-expr2Parser :: Parser Expr
-expr2Parser = parens exprParser
+opParser :: Parser Expr
+opParser = buildExpressionParser operatorsList expr3Parser
+
+operatorsList = [ [ Infix  (reservedOp "->" >> return Arrow) AssocLeft ] ]
+
+-- Parse expressions with precedence 3
+expr3Parser :: Parser Expr
+expr3Parser = parens exprParser
               <|> liftM Var identifier
               <|> liftM (\x -> IntConst $ fromInteger x) integer
               <|> liftM BoolConst boolParser
+
+-- Parse expressions with precedence 2
+expr2Parser :: Parser Expr
+expr2Parser = opParser
+              <|> expr3Parser
 
 -- Parse expressions with precedence 1
 expr1Parser :: Parser Expr

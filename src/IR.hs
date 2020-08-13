@@ -9,6 +9,7 @@ data Expr =
   | Assign String Expr Expr -- Name for debug purposes
   | IfThenElse Expr Expr Expr
   | Call Expr Expr
+  | Arrow Expr Expr
   deriving(Show)
 
 data Function =
