@@ -37,7 +37,7 @@ exprToIr (Parser.Arrow e1 e2) ctx = IR.Arrow (exprToIr e1 ctx) (exprToIr e2 ctx)
 -- Transform a parsed function to an IR function
 defToIr :: PDefinition -> Definition
 defToIr (PDefinition name args body typ) =
-  let (args', ctx') = Prelude.foldr (\(arg_name, arg_typ) (l, ctx) -> ((arg_name, exprToIr arg_typ ctx) : l, addVar arg_name ctx)) ([], emptyCtx) args in
+  let (args', ctx') = Prelude.foldl (\(l, ctx) (arg_name, arg_typ) -> (l ++ [(arg_name, exprToIr arg_typ ctx)], addVar arg_name ctx)) ([], emptyCtx) args in
   let typ' = exprToIr typ ctx' in
   let body' = exprToIr body ctx' in
   Definition name args' typ' body'
