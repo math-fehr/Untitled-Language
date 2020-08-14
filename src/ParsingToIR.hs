@@ -24,8 +24,8 @@ addVar str (PIRContext ctx) = PIRContext (str : ctx)
 
 -- Transform a parsed expression to an IR expression
 exprToIr :: Parser.Expr -> PIRContext -> IR.Expr
-exprToIr (Var "bool") _ = IR.PrimitiveType "bool"
-exprToIr (Var "int") _ = IR.PrimitiveType "int"
+exprToIr (Var "bool") _ = IR.PrimitiveType BoolType
+exprToIr (Var "int") _ = IR.PrimitiveType IntType
 exprToIr (Var str) ctx = fromMaybe (Def str) $ fmap (LocalVar str) $ findVar str ctx
 exprToIr (Parser.IntConst i) _ = IR.IntConst i
 exprToIr (Parser.BoolConst b) _ = IR.BoolConst b

@@ -2,16 +2,22 @@ module IR where
 
 import Data.Map (Map)
 
+data PrimitiveDataType =
+  IntType
+  | BoolType
+  deriving(Show)
+
 data Expr =
   LocalVar String Int -- De Bruijn index, and name for debug purposes
   | Def String -- Definition
   | IntConst Int
   | BoolConst Bool
-  | PrimitiveType String -- String representation of a primitive type
+  | PrimitiveType PrimitiveDataType
   | Assign String Expr Expr -- Name for debug purposes
   | IfThenElse Expr Expr Expr
   | Call Expr Expr
   | Arrow Expr Expr
+  | Type
   deriving(Show)
 
 data Definition =

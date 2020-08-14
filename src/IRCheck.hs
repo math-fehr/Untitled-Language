@@ -15,6 +15,7 @@ getExprDefs (Assign _ e1 e2) = getExprDefs e1 ++ getExprDefs e2
 getExprDefs (IfThenElse e1 e2 e3) = getExprDefs e1 ++ getExprDefs e2 ++ getExprDefs e3
 getExprDefs (Call e1 e2) = getExprDefs e1 ++ getExprDefs e2
 getExprDefs (Arrow e1 e2) = getExprDefs e1 ++ getExprDefs e2
+getExprDefs Type = []
 
 -- Get definitions referenced by the definition
 getDefDefs :: Definition -> [String]
