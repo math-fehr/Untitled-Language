@@ -30,13 +30,13 @@ getProgramDefs :: Program -> [String]
 getProgramDefs p = concat $ elems $ Data.Map.map getDefDefs p
 
 -- Check that all definitions referenced by the program are in the program
-checkDefs :: Program -> Maybe Error
+checkDefs :: Program -> Either Error ()
 checkDefs p =
   let nonMember = Prelude.filter (\x -> notMember x p) $ getProgramDefs p in
   if Prelude.null nonMember then
-    Nothing
+    return ()
   else
-    Just $ DefsNotFound nonMember
+    Left $ DefsNotFound nonMember
 
-checkIR :: Program -> Maybe Error
+checkIR :: Program -> Either Error ()
 checkIR p = checkDefs p

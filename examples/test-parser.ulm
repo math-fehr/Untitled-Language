@@ -11,8 +11,8 @@ fun applytwice (f: bool -> bool) (b: bool) : bool :=
     f (f b)
 
 fun f1 (a: bool) (b: bool) (c: bool) : bool :=
-    let ab := and a b in
-    or c ab
+    let ab := (and a) b in
+    (or c) ab
 
 fun f2 (a: bool) : bool :=
-    f1 a (not a) (not (not a))
+    ((f1 a) (not a)) (not (not a))

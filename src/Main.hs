@@ -1,9 +1,15 @@
 import Parser
 import ParsingToIR
 import IRCheck
+import Typing
+
+checkAndType parsed_ir =
+    do let ir = parsedProgramToIr parsed_ir
+       checkIR ir
+       checkProgramWellTyped ir
+       return ir
 
 main = do parsed_ir <- Parser.parseFile "examples/test-parser.ulm"
-          let ir = parsedProgramToIr parsed_ir in
-            case checkIR ir of
-              Nothing -> putStrLn . show $ ir
-              Just err -> putStrLn . show $ err
+          case checkAndType parsed_ir of
+            Left err -> putStrLn . show $ err
+            Right res -> putStrLn . show $ res
