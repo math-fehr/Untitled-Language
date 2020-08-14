@@ -5,7 +5,7 @@ import Data.Map (Map)
 data PrimitiveDataType =
   IntType
   | BoolType
-  deriving(Show)
+  deriving(Show, Eq)
 
 data Expr =
   LocalVar String Int -- De Bruijn index, and name for debug purposes
@@ -19,6 +19,19 @@ data Expr =
   | Arrow Expr Expr
   | Type
   deriving(Show)
+
+instance Eq Expr where
+  LocalVar _ i == LocalVar _ i' = i == i'
+  Def s == Def s' = s == s'
+  IntConst i == IntConst i' = i == i'
+  BoolConst b == BoolConst b' = b == b'
+  PrimitiveType t == PrimitiveType t' = t == t'
+  Assign _ e1 e2 == Assign _ e1' e2' = e1 == e1' && e2 == e2'
+  IfThenElse cond e1 e2 == IfThenElse cond' e1' e2' = e1 == e1' && e2 == e2' && cond == cond'
+  Call e1 e2 == Call e1' e2' = e1 == e1' && e2 == e2'
+  Arrow e1 e2 == Arrow e1' e2' = e1 == e1' && e2 == e2'
+  Type == Type = True
+  _ == _ = False
 
 data Definition =
   Definition { fun_name :: String
