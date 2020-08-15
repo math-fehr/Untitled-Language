@@ -72,6 +72,10 @@ checkExprWellTyped ctx p (Arrow e1 e2) =
   do checkExprWellTypedHasType ctx p e1 Type
      checkExprWellTypedHasType ctx p e2 Type
      return Type
+checkExprWellTyped ctx p (Lambda _ e1 e2) =
+  do checkExprWellTypedHasType ctx p e1 Type
+     typ <- checkExprWellTyped (addVarType e1 ctx) p e2
+     return $ Arrow e1 typ
 checkExprWellTyped _ _ Type = return Type
 
 -- Check that given a context, the definition is well typed, and return its type

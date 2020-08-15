@@ -16,6 +16,7 @@ data Expr =
   | Call Expr Expr
   | IfThenElse Expr Expr Expr
   | Arrow Expr Expr
+  | Lambda String Expr Expr
   deriving(Show)
 
 data PDefinition = PDefinition
@@ -36,6 +37,7 @@ languageDef =
                                      , "in"
                                      , "true"
                                      , "false"
+                                     , "def"
                                      , "fun"
                                      , "if"
                                      , "then"
@@ -67,6 +69,15 @@ assignParser =
      reserved "in"
      body <- exprParser
      return $ Assign var expr body
+
+-- Parse lambda functions
+lambdaParser :: Parser Expr
+lambdaParser =
+  do reserved "fun"
+     (var, typ) <- typedVarParser
+     reserved "=>"
+     body <- exprParser
+     return $ Lambda var typ body
 
 callParser :: Parser Expr
 callParser = do fun <- expr2Parser
@@ -112,6 +123,7 @@ expr1Parser = try callParser
 exprParser :: Parser Expr
 exprParser = ifParser <|>
              assignParser <|>
+             lambdaParser <|>
              expr1Parser
 
 -- Parse a variable that has a type
@@ -122,7 +134,7 @@ typedVarParser = parens (do name <- identifier
                             return (name, typ))
 
 definitionParser :: Parser PDefinition
-definitionParser = do reserved "fun"
+definitionParser = do reserved "def"
                       name <- identifier
                       args <- (many typedVarParser)
                       reservedOp ":"

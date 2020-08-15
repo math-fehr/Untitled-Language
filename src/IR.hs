@@ -16,6 +16,7 @@ data Expr =
   | Assign String Expr Expr -- Name for debug purposes
   | IfThenElse Expr Expr Expr
   | Call Expr Expr
+  | Lambda String Expr Expr
   | Arrow Expr Expr
   | Type
   deriving(Show)
@@ -30,6 +31,7 @@ instance Eq Expr where
   IfThenElse cond e1 e2 == IfThenElse cond' e1' e2' = e1 == e1' && e2 == e2' && cond == cond'
   Call e1 e2 == Call e1' e2' = e1 == e1' && e2 == e2'
   Arrow e1 e2 == Arrow e1' e2' = e1 == e1' && e2 == e2'
+  Lambda _ e1 e2 == Lambda _ e1' e2' = e1 == e1' && e2 == e2'
   Type == Type = True
   _ == _ = False
 

@@ -33,6 +33,7 @@ exprToIr (Parser.Assign s expr body) ctx = IR.Assign s (exprToIr expr ctx) (expr
 exprToIr (Parser.Call fun arg) ctx = IR.Call (exprToIr fun ctx) (exprToIr arg ctx)
 exprToIr (Parser.IfThenElse c e1 e2) ctx = IR.IfThenElse (exprToIr c ctx) (exprToIr e1 ctx) (exprToIr e2 ctx)
 exprToIr (Parser.Arrow e1 e2) ctx = IR.Arrow (exprToIr e1 ctx) (exprToIr e2 ctx)
+exprToIr (Parser.Lambda s e1 e2) ctx = IR.Lambda s (exprToIr e1 ctx) (exprToIr e2 (addVar s ctx))
 
 -- Transform a parsed function to an IR function
 defToIr :: PDefinition -> Definition

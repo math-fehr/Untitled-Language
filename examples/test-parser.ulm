@@ -1,18 +1,21 @@
-fun not (a: bool) : bool :=
+def not (a: bool) : bool :=
     if a then false else true
 
-fun and (a: bool) (b: bool) : bool :=
+def and (a: bool) (b: bool) : bool :=
     if a then b else false
 
-fun or (a: bool) (b: bool) : bool :=
+def or (a: bool) (b: bool) : bool :=
     if a then true else b
 
-fun applytwice (f: bool -> bool) (b: bool) : bool :=
+def id : bool -> bool :=
+    fun (x: bool) => x
+
+def applytwice (f: bool -> bool) (b: bool) : bool :=
     f (f b)
 
-fun f1 (a: bool) (b: bool) (c: bool) : bool :=
+def f1 (a: bool) (b: bool) (c: bool) : bool :=
     let ab := (and a) b in
     (or c) ab
 
-fun f2 (a: bool) : bool :=
+def f2 (a: bool) : bool :=
     ((f1 a) (not a)) (not (not a))
