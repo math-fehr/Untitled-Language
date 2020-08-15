@@ -7,15 +7,18 @@ def and (a: bool) (b: bool) : bool :=
 def or (a: bool) (b: bool) : bool :=
     if a then true else b
 
+def xor (a: bool) (b: bool) : bool :=
+    (and ((or a) b)) (not ((and a) b))
+
 def id : bool -> bool :=
     fun (x: bool) => x
 
 def applytwice (f: bool -> bool) (b: bool) : bool :=
     f (f b)
 
-def f1 (a: bool) (b: bool) (c: bool) : bool :=
+def aborc (a: bool) (b: bool) (c: bool) : bool :=
     let ab := (and a) b in
     (or c) ab
 
-def f2 (a: bool) : bool :=
-    ((f1 a) (not a)) (not (not a))
+def alwaystrue (a: bool) : bool :=
+    ((aborc a) (not a)) (not (not a))
