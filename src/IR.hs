@@ -2,17 +2,17 @@ module IR where
 
 import Data.Map (Map)
 
-data PrimitiveDataType =
-  IntType
+data ConstType =
+  IntConst Int
+  | BoolConst Bool
   | BoolType
+  | IntType
   deriving(Show, Eq)
 
 data Expr =
   LocalVar String Int -- De Bruijn index, and name for debug purposes
   | Def String -- Definition
-  | IntConst Int
-  | BoolConst Bool
-  | PrimitiveType PrimitiveDataType
+  | Const ConstType
   | Assign String Expr Expr -- Name for debug purposes
   | IfThenElse Expr Expr Expr
   | Call Expr Expr
@@ -24,9 +24,7 @@ data Expr =
 instance Eq Expr where
   LocalVar _ i == LocalVar _ i' = i == i'
   Def s == Def s' = s == s'
-  IntConst i == IntConst i' = i == i'
-  BoolConst b == BoolConst b' = b == b'
-  PrimitiveType t == PrimitiveType t' = t == t'
+  Const c == Const c' = c == c'
   Assign _ e1 e2 == Assign _ e1' e2' = e1 == e1' && e2 == e2'
   IfThenElse cond e1 e2 == IfThenElse cond' e1' e2' = e1 == e1' && e2 == e2' && cond == cond'
   Call e1 e2 == Call e1' e2' = e1 == e1' && e2 == e2'

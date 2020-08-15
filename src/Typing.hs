@@ -46,18 +46,23 @@ checkExprWellTypedHasType ctx p e expected_typ =
      else
        Left $ ShouldBeType e typ expected_typ
 
+-- Get the type of a Const
+getConstType :: ConstType -> Expr
+getConstType (BoolConst _) = Const BoolType
+getConstType (IntConst _) = Const IntType
+getConstType IntType = Type
+getConstType BoolType = Type
+
 -- Check that the term is well typed, and return its type
 checkExprWellTyped :: TypingContext -> Program -> Expr -> Either Error Expr
 checkExprWellTyped ctx _ (LocalVar _ idx) = return $ getVarType idx ctx
 checkExprWellTyped _ p (Def d) = checkDefTypeWellTyped (p ! d) p
-checkExprWellTyped _ _ (IntConst _) = return $ PrimitiveType IntType
-checkExprWellTyped _ _ (BoolConst _) = return $ PrimitiveType BoolType
-checkExprWellTyped _ _ (PrimitiveType _) = return $ Type
+checkExprWellTyped _ _ (Const c) = return $ getConstType c
 checkExprWellTyped ctx p (Assign _ sub_e e) =
   do sub_e_type <- checkExprWellTyped ctx p sub_e
      checkExprWellTyped (addVarType sub_e_type ctx) p e
 checkExprWellTyped ctx p (IfThenElse cond e1 e2) =
-  do checkExprWellTypedHasType ctx p cond (PrimitiveType BoolType)
+  do checkExprWellTypedHasType ctx p cond (Const BoolType)
      e1_type <- checkExprWellTyped ctx p e1
      checkExprWellTypedHasType ctx p e2 e1_type
      return $ e1_type

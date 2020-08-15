@@ -8,9 +8,7 @@ import Error
 getExprDefs :: Expr -> [String]
 getExprDefs (LocalVar _ _) = []
 getExprDefs (Def s) = [s]
-getExprDefs (IntConst _) = []
-getExprDefs (BoolConst _) = []
-getExprDefs (PrimitiveType _) = []
+getExprDefs (Const _) = []
 getExprDefs (Assign _ e1 e2) = getExprDefs e1 ++ getExprDefs e2
 getExprDefs (IfThenElse e1 e2 e3) = getExprDefs e1 ++ getExprDefs e2 ++ getExprDefs e3
 getExprDefs (Call e1 e2) = getExprDefs e1 ++ getExprDefs e2
