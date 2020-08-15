@@ -79,10 +79,13 @@ lambdaParser =
      body <- exprParser
      return $ Lambda var typ body
 
+exprListToCall :: [Expr] -> Expr
+exprListToCall [e] = e
+exprListToCall (e1 : e2 : es) = exprListToCall ((Call e1 e2) : es)
+
 callParser :: Parser Expr
-callParser = do fun <- expr2Parser
-                arg <- expr1Parser
-                return $ Call fun arg
+callParser = do exprs <- sepBy1 expr1Parser (return $ ())
+                return $ exprListToCall exprs
 
 boolParser :: Parser Bool
 boolParser = (reserved "true" >> return True)
@@ -98,25 +101,20 @@ ifParser = do reserved "if"
               return $ IfThenElse cond trueCase falseCase
 
 opParser :: Parser Expr
-opParser = buildExpressionParser operatorsList expr3Parser
+opParser = buildExpressionParser operatorsList expr2Parser
 
 operatorsList = [ [ Infix  (reservedOp "->" >> return Arrow) AssocLeft ] ]
 
--- Parse expressions with precedence 3
-expr3Parser :: Parser Expr
-expr3Parser = parens exprParser
+-- Parse expressions with precedence 2
+expr2Parser :: Parser Expr
+expr2Parser = parens exprParser
               <|> liftM Var identifier
               <|> liftM (\x -> IntConst $ fromInteger x) integer
               <|> liftM BoolConst boolParser
 
--- Parse expressions with precedence 2
-expr2Parser :: Parser Expr
-expr2Parser = opParser
-              <|> expr3Parser
-
 -- Parse expressions with precedence 1
 expr1Parser :: Parser Expr
-expr1Parser = try callParser
+expr1Parser = opParser
               <|> expr2Parser
 
 -- Parse expressions with precedence 0
@@ -124,7 +122,7 @@ exprParser :: Parser Expr
 exprParser = ifParser <|>
              assignParser <|>
              lambdaParser <|>
-             expr1Parser
+             callParser
 
 -- Parse a variable that has a type
 typedVarParser :: Parser (String, Expr)
