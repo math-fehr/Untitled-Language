@@ -1,17 +1,10 @@
 import Parser
 import ParsingToIR
-import IRCheck
-import IRUtils
 import Typing
-import IR
 import BoolTest
 
-import Control.Monad
-import Data.Map
-
 checkAndType parsed_ir =
-    do let ir = parsedProgramToIr parsed_ir
-       checkIR ir
+    do ir <- parsedProgramToIr parsed_ir
        checkProgramWellTyped ir
        return ir
 

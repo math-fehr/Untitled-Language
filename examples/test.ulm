@@ -1,3 +1,7 @@
+enum bool2 :=
+| true2
+| false2
+
 def not (a: bool) : bool :=
     if a then false else true
 

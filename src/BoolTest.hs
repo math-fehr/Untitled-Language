@@ -32,7 +32,7 @@ runBooleanDef p def =
   if not (isBooleanDef def) then
     return ()
   else
-    let all_booleans = generateAllBoolCombinations (length $ fun_args def) in
+    let all_booleans = generateAllBoolCombinations (length $ def_args def) in
     let exprs = fmap (callBoolList (getExprFromDef def)) all_booleans in
     let results = zip all_booleans $ fmap (callByValue p) exprs in
     let print_results = foldM (\_ (inputs, output) -> (putStrLn $ show inputs ++ " " ++ show (toBoolean output))) () results in
@@ -40,4 +40,4 @@ runBooleanDef p def =
 
 -- Run every boolean definition with all possible combinations of arguments
 runBooleanProgram :: Program -> IO ()
-runBooleanProgram p = foldM (\_ def -> (putStrLn $ "Function " ++ show (fun_name def)) >> runBooleanDef p def >> putStrLn "") () p
+runBooleanProgram p = foldM (\_ def -> (putStrLn $ "Function " ++ show (def_name def)) >> runBooleanDef p def >> putStrLn "") () (prog_defs p)

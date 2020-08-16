@@ -1,7 +1,6 @@
 module IRUtils where
 
 import IR
-import Data.Map
 
 -- Call with multiple arguments
 callArgumentList :: IR.Expr -> [IR.Expr] -> IR.Expr
@@ -17,6 +16,8 @@ subst idx sub_e (LocalVar s idx') =
     LT -> LocalVar s (idx' - 1)
     GT -> LocalVar s idx'
 subst _ _ (Def s) = Def s
+subst _ _ (InductiveType s) = InductiveType s
+subst _ _ (Constructor s idx) = Constructor s idx
 subst _ _ (Const c) = Const c
 subst idx sub_e (Assign s e1 e2) = Assign s (subst idx sub_e e1) (subst (idx + 1) sub_e e2)
 subst idx sub_e (IfThenElse e1 e2 e3) = IfThenElse (subst idx sub_e e1) (subst idx sub_e e2) (subst idx sub_e e3)
@@ -44,10 +45,12 @@ callByValue _ (LocalVar s idx) = LocalVar s idx
 -- Keep the definition in case it has arguments (because it is a value),
 -- ortherwise unfolds it
 callByValue p (Def s) =
-  let def = p ! s in
-    if fun_args def == [] then
+  let def = getDefinition s p in
+    if def_args def == [] then
       callByValue p (getExprFromDef def)
     else Def s
+callByValue _ (InductiveType s) = InductiveType s
+callByValue _ (Constructor s idx) = Constructor s idx
 callByValue _ (Const c) = Const c
 callByValue p (Assign _ e1 e2) = callByValue p $ subst 0 e1 e2
 callByValue p (IfThenElse cond e1 e2) =
@@ -58,7 +61,7 @@ callByValue p (IfThenElse cond e1 e2) =
 callByValue p (Call fun arg) =
   case callByValue p fun of
     Lambda _ _ body -> callByValue p (subst 0 arg body)
-    Def s -> callByValue p (Call (getExprFromDef (p ! s)) arg)
+    Def s -> callByValue p (Call (getExprFromDef (getDefinition s p)) arg)
     fun' -> Call fun' arg
 callByValue _ (Lambda s e1 e2) = Lambda s e1 e2
 callByValue _ (Arrow e1 e2) = Arrow e1 e2

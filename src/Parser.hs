@@ -20,11 +20,26 @@ data Expr =
   deriving(Show)
 
 data PDefinition = PDefinition
-  { pfun_name :: String
-  , pfun_args :: [(String, Expr)]
-  , pfun_body :: Expr
-  , pwfun_type :: Expr
+  { pdef_name :: String
+  , pdef_args :: [(String, Expr)]
+  , pdef_body :: Expr
+  , pdef_type :: Expr
   } deriving(Show)
+
+data PInductiveConstructor = PInductiveConstructor
+  { pconstr_name :: String
+  , pconstr_args :: [(String, Expr)] }
+
+data PInductive = PInductive
+  { pind_name :: String
+  , pind_args :: [(String, Expr)]
+  , pind_constr :: [PInductiveConstructor] }
+
+data DeclarationType =
+  InductiveDecl PInductive
+  | DefinitionDecl PDefinition
+
+type Program = [DeclarationType]
 
 -- Lexer
 languageDef =
@@ -44,7 +59,7 @@ languageDef =
                                      , "else"
                                      ]
            , Token.reservedOpNames = ["+", "-", "*", "/", ":="
-                                     , "<", ">", "->"
+                                     , "<", ">", "->", "|"
                                      ]
            }
 
@@ -131,7 +146,7 @@ typedVarParser = parens (do name <- identifier
                             typ <- exprParser
                             return (name, typ))
 
-definitionParser :: Parser PDefinition
+definitionParser :: Parser DeclarationType
 definitionParser = do reserved "def"
                       name <- identifier
                       args <- (many typedVarParser)
@@ -139,17 +154,31 @@ definitionParser = do reserved "def"
                       typ <- exprParser
                       reservedOp ":="
                       body <- exprParser
-                      return $ PDefinition name args body typ
+                      return $ DefinitionDecl $ PDefinition name args body typ
+
+-- An inductive constructor parser
+inductiveConstructorParser :: Parser PInductiveConstructor
+inductiveConstructorParser = do reservedOp "|"
+                                name <- identifier
+                                args <- (many typedVarParser)
+                                return $ PInductiveConstructor name args
+
+-- An inductive parser
+inductiveParser :: Parser DeclarationType
+inductiveParser = do reserved "enum"
+                     name <- identifier
+                     args <- (many typedVarParser)
+                     reservedOp ":="
+                     constructors <- many inductiveConstructorParser
+                     return $ InductiveDecl $ PInductive name args constructors
 
 -- Main parser
-programParser :: Parser [PDefinition]
-programParser = whiteSpace >> many definitionParser
+programParser :: Parser Program
+programParser = whiteSpace >> many (definitionParser <|> inductiveParser)
 
 -- Parse a file
-parseFile :: String -> IO [PDefinition]
+parseFile :: String -> IO Program
 parseFile file = do program <- readFile file
                     case parse programParser "" program of
                       Left e -> print e >> fail "parse error"
                       Right r -> return r
-
-
