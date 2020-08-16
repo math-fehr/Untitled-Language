@@ -34,7 +34,7 @@ isValue _ = False
 -- Get an expression from a definition
 getExprFromDef :: Definition -> Expr
 getExprFromDef (Definition name ((arg_name, arg) : args) typ body) =
-  Lambda arg_name arg $ getExprFromDef (Definition name args typ body)
+  Lambda (DI arg_name) arg $ getExprFromDef (Definition name args typ body)
 getExprFromDef (Definition _ [] _ body) = body
 
 -- Big step semantics of call by value

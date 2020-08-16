@@ -25,7 +25,7 @@ emptyCtx = PIRContext [] S.empty S.empty M.empty
 -- Get an expression from an identifier
 getExprFromIdent :: String -> PIRContext -> Maybe IR.Expr
 getExprFromIdent str (PIRContext local def ind constrs)
-  | str `elem`     local  = LocalVar str <$> elemIndex str local
+  | str `elem`     local  = LocalVar (DI str) <$> elemIndex str local
   | str `S.member` def    = Just $ Def str
   | str `S.member` ind    = Just $ InductiveType str
   | str `M.member` constrs =
@@ -88,7 +88,7 @@ exprToIr (Parser.BoolConst b) _ = return $ IR.Const (IR.BoolConst b)
 exprToIr (Parser.Assign s expr body) ctx =
   do expr' <- exprToIr expr ctx
      body' <- exprToIr body (addLocalVar s ctx)
-     return $ IR.Assign s expr' body'
+     return $ IR.Assign (DI s) expr' body'
 exprToIr (Parser.Call fun arg) ctx =
   do fun' <- exprToIr fun ctx
      arg' <- exprToIr arg ctx
@@ -105,7 +105,7 @@ exprToIr (Parser.Arrow e1 e2) ctx =
 exprToIr (Parser.Lambda s e1 e2) ctx =
   do e1' <- exprToIr e1 ctx
      e2' <- exprToIr e2 (addLocalVar s ctx)
-     return $ IR.Lambda s e1' e2'
+     return $ IR.Lambda (DI s) e1' e2'
 
 argsToIr :: [(String, Parser.Expr)] -> PIRContext -> Either Error ([(String, IR.Expr)], PIRContext)
 argsToIr args ctx =

@@ -9,33 +9,25 @@ data ConstType
   | IntType
   deriving (Show, Eq)
 
+data DebugInfo a = DI a
+instance Eq (DebugInfo a) where
+  (==) = const $ const True
+instance Show a => Show (DebugInfo a) where
+  show (DI x) = show x
+
 data Expr
-  = LocalVar String Int -- De Bruijn index, and name for debug purposes
+  = LocalVar (DebugInfo String) Int
   | Def String -- Definition
   | InductiveType String
   | Constructor String Int
   | Const ConstType
-  | Assign String Expr Expr -- Name for debug purposes
+  | Assign (DebugInfo String) Expr Expr
   | IfThenElse Expr Expr Expr
   | Call Expr Expr
-  | Lambda String Expr Expr -- Name for debug purposes
+  | Lambda (DebugInfo String) Expr Expr
   | Arrow Expr Expr
   | Type
-  deriving (Show)
-
-instance Eq Expr where
-  LocalVar _ i == LocalVar _ i' = i == i'
-  Def s == Def s' = s == s'
-  InductiveType s == InductiveType s' = s == s'
-  Constructor i c == Constructor i' c' = i == i' && c == c'
-  Const c == Const c' = c == c'
-  Assign _ e1 e2 == Assign _ e1' e2' = e1 == e1' && e2 == e2'
-  IfThenElse cond e1 e2 == IfThenElse cond' e1' e2' = e1 == e1' && e2 == e2' && cond == cond'
-  Call e1 e2 == Call e1' e2' = e1 == e1' && e2 == e2'
-  Arrow e1 e2 == Arrow e1' e2' = e1 == e1' && e2 == e2'
-  Lambda _ e1 e2 == Lambda _ e1' e2' = e1 == e1' && e2 == e2'
-  Type == Type = True
-  _ == _ = False
+  deriving (Eq,Show)
 
 data Definition = Definition
   { def_name :: String
