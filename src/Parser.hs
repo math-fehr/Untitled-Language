@@ -9,7 +9,7 @@ import qualified Text.ParserCombinators.Parsec.Token as Token
 
 -- Parsed AST
 data Expr =
-  Var String
+    Var String
   | IntConst Int
   | BoolConst Bool
   | Assign String Expr Expr
@@ -31,12 +31,12 @@ data PInductiveConstructor = PInductiveConstructor
   , pconstr_args :: [(String, Expr)] }
 
 data PInductive = PInductive
-  { pind_name :: String
-  , pind_args :: [(String, Expr)]
+  { pind_name   :: String
+  , pind_args   :: [(String, Expr)]
   , pind_constr :: [PInductiveConstructor] }
 
 data DeclarationType =
-  InductiveDecl PInductive
+    InductiveDecl  PInductive
   | DefinitionDecl PDefinition
 
 type Program = [DeclarationType]
@@ -95,16 +95,14 @@ lambdaParser =
      return $ Lambda var typ body
 
 exprListToCall :: [Expr] -> Expr
-exprListToCall [e] = e
-exprListToCall (e1 : e2 : es) = exprListToCall ((Call e1 e2) : es)
+exprListToCall = foldl1 Call
 
 callParser :: Parser Expr
-callParser = do exprs <- sepBy1 expr1Parser (return $ ())
-                return $ exprListToCall exprs
+callParser = exprListToCall <$> sepBy1 expr1Parser (return ())
 
 boolParser :: Parser Bool
 boolParser = (reserved "true" >> return True)
-             <|> (reserved "false" >> return False)
+         <|> (reserved "false" >> return False)
 
 ifParser :: Parser Expr
 ifParser = do reserved "if"
@@ -123,21 +121,21 @@ operatorsList = [ [ Infix  (reservedOp "->" >> return Arrow) AssocLeft ] ]
 -- Parse expressions with precedence 2
 expr2Parser :: Parser Expr
 expr2Parser = parens exprParser
-              <|> liftM Var identifier
-              <|> liftM (\x -> IntConst $ fromInteger x) integer
-              <|> liftM BoolConst boolParser
+          <|> Var <$> identifier
+          <|> (IntConst . fromInteger) <$> integer
+          <|> BoolConst <$> boolParser
 
 -- Parse expressions with precedence 1
 expr1Parser :: Parser Expr
 expr1Parser = opParser
-              <|> expr2Parser
+          <|> expr2Parser
 
 -- Parse expressions with precedence 0
 exprParser :: Parser Expr
-exprParser = ifParser <|>
-             assignParser <|>
-             lambdaParser <|>
-             callParser
+exprParser = ifParser
+         <|> assignParser
+         <|> lambdaParser
+         <|> callParser
 
 -- Parse a variable that has a type
 typedVarParser :: Parser (String, Expr)

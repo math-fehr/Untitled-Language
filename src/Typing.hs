@@ -33,7 +33,7 @@ checkBigArrow ctx p (e1 : e2 : es) =
 -- Does not check if the body is well typed
 checkDefTypeWellTyped :: Definition -> Program -> Either Error Expr
 checkDefTypeWellTyped (Definition _ args typ _) p =
-  checkBigArrow emptyCtx p ((Prelude.map snd args) ++ [typ])
+  checkBigArrow emptyCtx p (fmap snd args ++ [typ])
 
 -- Check that an expression is well typed, and that its type is equal to
 -- some given type

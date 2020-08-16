@@ -1,32 +1,35 @@
 module ParsingToIR where
 
-import IR
-import Parser
-import Data.List
-import Data.Map
-import Data.Set
-import Error
-import Control.Monad
+import           IR
+import           Parser
+import           Data.List
+import           Data.Map
+import qualified Data.Map      as M
+import           Data.Set         (Set)
+import qualified Data.Set      as S
+import           Data.Maybe
+import           Error
+import           Control.Monad
 
 -- Local variable context
 data PIRContext = PIRContext
-  { pirctx_local :: [String]
-  , pirctx_def :: Set String
-  , pirctx_ind :: Set String
+  { pirctx_local  :: [String]
+  , pirctx_def    :: Set String
+  , pirctx_ind    :: Set String
   , pirctx_constr :: Map String (String, Int) }
 
 -- An empty context
 emptyCtx :: PIRContext
-emptyCtx = PIRContext [] Data.Set.empty Data.Set.empty Data.Map.empty
+emptyCtx = PIRContext [] S.empty S.empty M.empty
 
 -- Get an expression from an identifier
 getExprFromIdent :: String -> PIRContext -> Maybe IR.Expr
-getExprFromIdent str ctx
-  | elem str (pirctx_local ctx) = (LocalVar str) <$> elemIndex str (pirctx_local ctx)
-  | Data.Set.member str (pirctx_def ctx) = Just $ Def str
-  | Data.Set.member str (pirctx_ind ctx) = Just $ InductiveType str
-  | Data.Map.member str (pirctx_constr ctx) =
-    let (constr, idx) = ((pirctx_constr ctx) ! str) in
+getExprFromIdent str (PIRContext local def ind constrs)
+  | str `elem`     local  = LocalVar str <$> elemIndex str local
+  | str `S.member` def    = Just $ Def str
+  | str `S.member` ind    = Just $ InductiveType str
+  | str `M.member` constrs =
+    let (constr, idx) = constrs ! str in
       Just $ Constructor constr idx
   | otherwise = Nothing
 
@@ -36,22 +39,22 @@ addLocalVar str (PIRContext local def ind constr) = PIRContext (str : local) def
 
 -- Add a definition to the context
 addDef :: String -> PIRContext -> Either Error PIRContext
-addDef str (PIRContext local def ind constr)
-  | getExprFromIdent str (PIRContext local def ind constr) == Nothing =
-    return $ PIRContext local (Data.Set.insert str def) ind constr
+addDef str con@(PIRContext local def ind constr)
+  | isNothing $ getExprFromIdent str con =
+      return $ PIRContext local (S.insert str def) ind constr
   | otherwise = Left $ DuplicateDefinition str
 
 -- Add an inductive type to the context
 addIndType :: String -> PIRContext ->  Either Error PIRContext
-addIndType str (PIRContext local def ind constr)
-  | getExprFromIdent str (PIRContext local def ind constr) == Nothing =
-    return $ PIRContext local def (Data.Set.insert str ind) constr
+addIndType str con@(PIRContext local def ind constr)
+  | isNothing $ getExprFromIdent str con =
+    return $ PIRContext local def (S.insert str ind) constr
   | otherwise = Left $ DuplicateDefinition str
 
 -- Add an inductive constructor to the context
 addIndConstr :: String -> String -> Int -> PIRContext -> Either Error PIRContext
-addIndConstr ind constr idx (PIRContext local defs inds constrs)
-  | getExprFromIdent constr (PIRContext local defs inds constrs)  == Nothing =
+addIndConstr ind constr idx con@(PIRContext local defs inds constrs)
+  | isNothing $ getExprFromIdent constr con =
       return $ PIRContext local defs inds (Data.Map.insert constr (ind, idx) constrs)
   | otherwise = Left $ DuplicateDefinition constr
 
@@ -63,14 +66,14 @@ addInd (PInductive name args ind_constrs) ctx = do
   PIRContext _ def inds constrs <-
     foldM (\ctx' (idx, PInductiveConstructor constr _) ->
               addIndConstr name constr idx ctx')
-    ctx_with_args (zip [0..] ind_constrs)
+          ctx_with_args (zip [0..] ind_constrs)
   return $ PIRContext (pirctx_local ctx) def inds constrs
 
 -- Add all definitions and declarations to the context
 getProgramCtx :: Parser.Program -> Either Error PIRContext
 getProgramCtx [] = return emptyCtx
-getProgramCtx (InductiveDecl ind : p) = getProgramCtx p >>= addInd ind
-getProgramCtx (DefinitionDecl d : p) = getProgramCtx p >>= addDef (pdef_name d)
+getProgramCtx (InductiveDecl  ind : p) = getProgramCtx p >>= addInd ind
+getProgramCtx (DefinitionDecl d   : p) = getProgramCtx p >>= addDef (pdef_name d)
 
 -- Transform a parsed expression to an IR expression
 exprToIr :: Parser.Expr -> PIRContext -> Either Error IR.Expr
@@ -109,7 +112,7 @@ argsToIr args ctx =
   foldM
     (\(l, ctx') (arg_name, arg_typ) ->
         do expr <- exprToIr arg_typ ctx'
-           return $ (l ++ [(arg_name, expr)], addLocalVar arg_name ctx'))
+           return (l ++ [(arg_name, expr)], addLocalVar arg_name ctx'))
     ([], ctx) args
 
 -- Transform a parsed function to an IR function
@@ -130,8 +133,8 @@ constrToIr (PInductiveConstructor name args) ctx = do
 indToIr :: PInductive -> PIRContext -> Either Error Inductive
 indToIr (PInductive name args constr) ctx = do
   (args', ctx') <- argsToIr args ctx
-  constr' <- foldM (\l constr' -> do constr'' <- constrToIr constr' ctx'
-                                     return $ constr'' : l) [] constr
+  constr' <- foldM (\l constr' -> (:l) <$> constrToIr constr' ctx')
+                   [] constr
   return $ Inductive name args' constr'
 
 -- Parse a parsed program to an IR program
@@ -140,8 +143,6 @@ parsedProgramToIr p =
   do ctx <- getProgramCtx p
      foldM (\p' decl ->
               case decl of
-                InductiveDecl ind -> do ind' <- indToIr ind ctx
-                                        return $ insertInductive ind' p'
-                DefinitionDecl def -> do def' <- defToIr def ctx
-                                         return $ insertDefinition def' p')
+                InductiveDecl  ind -> flip insertInductive  p' <$> indToIr ind ctx
+                DefinitionDecl def -> flip insertDefinition p' <$> defToIr def ctx)
        (IR.Program Data.Map.empty Data.Map.empty) p

@@ -4,9 +4,7 @@ import IR
 
 -- Call with multiple arguments
 callArgumentList :: IR.Expr -> [IR.Expr] -> IR.Expr
-callArgumentList fun [] = fun
-callArgumentList fun (arg : args) =
-  callArgumentList (IR.Call fun arg) args
+callArgumentList = foldl IR.Call
 
 -- Substitute a De Bruijn variable to an expression
 subst :: Int -> Expr -> Expr -> Expr

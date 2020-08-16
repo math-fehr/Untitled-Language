@@ -8,7 +8,7 @@ import Control.Monad
 isBooleanDef :: Definition -> Bool
 isBooleanDef (Definition _ args typ _) =
   typ == Const BoolType &&
-  all (((==) $ Const BoolType) . snd) args
+  all ((== Const BoolType) . snd) args
 
 -- Generate all possible boolean lists of a given size
 generateAllBoolCombinations :: Int -> [[Bool]]

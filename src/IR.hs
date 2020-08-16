@@ -2,15 +2,15 @@ module IR where
 
 import Data.Map
 
-data ConstType =
-  IntConst Int
+data ConstType
+  = IntConst Int
   | BoolConst Bool
   | BoolType
   | IntType
-  deriving(Show, Eq)
+  deriving (Show, Eq)
 
-data Expr =
-  LocalVar String Int -- De Bruijn index, and name for debug purposes
+data Expr
+  = LocalVar String Int -- De Bruijn index, and name for debug purposes
   | Def String -- Definition
   | InductiveType String
   | Constructor String Int
@@ -21,7 +21,7 @@ data Expr =
   | Lambda String Expr Expr -- Name for debug purposes
   | Arrow Expr Expr
   | Type
-  deriving(Show)
+  deriving (Show)
 
 instance Eq Expr where
   LocalVar _ i == LocalVar _ i' = i == i'
@@ -48,8 +48,8 @@ data InductiveConstructor = InductiveConstructor
   , constr_args :: [(String, Expr)] }
 
 data Inductive = Inductive
-  { ind_name :: String
-  , ind_args :: [(String, Expr)]
+  { ind_name   :: String
+  , ind_args   :: [(String, Expr)]
   , ind_constr :: [InductiveConstructor] }
 
 data Program = Program
