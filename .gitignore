@@ -1,3 +1,5 @@
 .envrc
-dist/
+dist*
 result
+*.local
+*_flymake.hs

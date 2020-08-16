@@ -10,11 +10,22 @@
     let
       system           = "x86_64-linux";
       pkgs             = nixpkgs.legacyPackages.${system};
-      compiler-set     = pkgs.haskell.packages.ghc8101;
       git-ignore       = pkgs.nix-gitignore.gitignoreSourcePure;
-      package          = compiler-set.callCabal2nix "Untitled-Language" (git-ignore [ ./.gitignore ] ./.) {};
+      compiler-set     = pkgs.haskell.packages.ghc8101.override {
+        overrides = self: super: {
+          untitled-language = super.callCabal2nix "Untitled-Language" (git-ignore [ ./.gitignore ] ./.) {};
+        };
+      };
+      shell            = compiler-set.shellFor {
+        packages = hpkgs: [ hpkgs.untitled-language ];
+        withHoogle = false;
+        buildInputs = with compiler-set; [
+        ];
+      };
     in {
-      packages.${system}.untitled-language = package;
+      packages.${system} = {
+        inherit (compiler-set) untitled-language;
+      };
       # {
       #   devShell = compiler-set.shellFor {
       #     packages = p: [ package ];
@@ -24,6 +35,7 @@
       #   };
       # };
       defaultPackage.${system} = self.packages.${system}.untitled-language;
+      devShell.${system} = shell;
     };
 }
 
