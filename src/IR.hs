@@ -26,6 +26,7 @@ data Expr
 instance Eq Expr where
   LocalVar _ i == LocalVar _ i' = i == i'
   Def s == Def s' = s == s'
+  InductiveType s == InductiveType s' = s == s'
   Constructor i c == Constructor i' c' = i == i' && c == c'
   Const c == Const c' = c == c'
   Assign _ e1 e2 == Assign _ e1' e2' = e1 == e1' && e2 == e2'
