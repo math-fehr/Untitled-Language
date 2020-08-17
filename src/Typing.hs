@@ -3,6 +3,7 @@ module Typing where
 import IR
 import Error
 import Data.Foldable
+import Control.Monad
 
 -- A context of variable types
 newtype TypingContext = TypingContext [Expr]
@@ -95,10 +96,29 @@ checkDefWellTyped' ctx p (Definition name ((_, arg) : args) typ body) =
      def_typ <- checkDefWellTyped' (addVarType arg ctx) p (Definition name args typ body)
      return $ Arrow arg def_typ
 
+-- Check that an inductive constructor declaration is well typed
+checkIndConstrWellTyped :: TypingContext -> Program -> InductiveConstructor -> Either Error ()
+checkIndConstrWellTyped ctx p (InductiveConstructor _ args) =
+  foldM (\ctx' (_, arg) ->
+           checkExprWellTypedHasType ctx' p arg Type >>
+           (return $ addVarType arg ctx'))
+        ctx args
+  >> return ()
+
+-- Check that an inductive declaration is well typed
+checkIndWellTyped :: Program -> Inductive -> Either Error ()
+checkIndWellTyped p (Inductive _ args constr) = do
+  ctx <- foldM (\ctx (_, arg) ->
+                  checkExprWellTypedHasType ctx p arg Type >>
+                  (return $ addVarType arg ctx))
+               emptyCtx args
+  traverse_ (checkIndConstrWellTyped ctx p) constr
+
 -- Check that the definition is well typed, and return its type
 checkDefWellTyped :: Program -> Definition -> Either Error Expr
 checkDefWellTyped = checkDefWellTyped' emptyCtx
 
 -- Check that a program is well typed
 checkProgramWellTyped :: Program -> Either Error ()
-checkProgramWellTyped p = traverse_ (checkDefWellTyped p) (prog_defs p)
+checkProgramWellTyped p@(Program defs inds) = traverse_ (checkDefWellTyped p) defs >>
+  traverse_ (checkIndWellTyped p) inds
