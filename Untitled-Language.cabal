@@ -21,8 +21,9 @@ executable Untitled-Language
   main-is:             Main.hs
   other-modules:       Parser, IR, IRUtils, ParsingToIR, Error, Typing, BoolTest
   -- other-extensions:
-  build-depends:       base >=4.14 && <4.15
-                     , parsec >= 3.1 && < 3.2
-                     , containers >= 0.6 && < 0.7
+  build-depends:       base >= 4.14 && < 5.0
+                     , parsec >= 3.1 && < 4.0
+                     , containers >= 0.6 && < 1.0
+                     , lens >= 4.19 && < 5.0
   hs-source-dirs:      src
   default-language:    Haskell2010

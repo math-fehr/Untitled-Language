@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module ParsingToIR where
 
 import           IR
@@ -10,13 +12,16 @@ import qualified Data.Set      as S
 import           Data.Maybe
 import           Error
 import           Control.Monad
+import           Control.Lens
 
 -- Local variable context
 data PIRContext = PIRContext
-  { pirctx_local  :: [String]
-  , pirctx_def    :: Set String
-  , pirctx_ind    :: Set String
-  , pirctx_constr :: Map String (String, Int) }
+  { _pirctx_local  :: [String]
+  , _pirctx_def    :: Set String
+  , _pirctx_ind    :: Set String
+  , _pirctx_constr :: Map String (String, Int) }
+
+makeLenses ''PIRContext
 
 -- An empty context
 emptyCtx :: PIRContext
@@ -35,27 +40,27 @@ getExprFromIdent str (PIRContext local def ind constrs)
 
 -- Add a local variable with de bruijn index 0 to the context
 addLocalVar :: String -> PIRContext -> PIRContext
-addLocalVar str (PIRContext local def ind constr) = PIRContext (str : local) def ind constr
+addLocalVar str = pirctx_local %~ (str :)
 
 -- Add a definition to the context
 addDef :: String -> PIRContext -> Either Error PIRContext
-addDef str con@(PIRContext local def ind constr)
-  | isNothing $ getExprFromIdent str con =
-      return $ PIRContext local (S.insert str def) ind constr
+addDef str ctx
+  | isNothing $ getExprFromIdent str ctx =
+    return $ pirctx_def %~ (S.insert str) $ ctx
   | otherwise = Left $ DuplicateDefinition str
 
 -- Add an inductive type to the context
 addIndType :: String -> PIRContext ->  Either Error PIRContext
-addIndType str con@(PIRContext local def ind constr)
-  | isNothing $ getExprFromIdent str con =
-    return $ PIRContext local def (S.insert str ind) constr
+addIndType str ctx
+  | isNothing $ getExprFromIdent str ctx =
+    return $ pirctx_ind %~ (S.insert str) $ ctx
   | otherwise = Left $ DuplicateDefinition str
 
 -- Add an inductive constructor to the context
 addIndConstr :: String -> String -> Int -> PIRContext -> Either Error PIRContext
-addIndConstr ind constr idx con@(PIRContext local defs inds constrs)
-  | isNothing $ getExprFromIdent constr con =
-      return $ PIRContext local defs inds (Data.Map.insert constr (ind, idx) constrs)
+addIndConstr ind constr idx ctx
+  | isNothing $ getExprFromIdent constr ctx =
+      return $ pirctx_constr %~ (M.insert constr (ind, idx)) $ ctx
   | otherwise = Left $ DuplicateDefinition constr
 
 -- Add an inductive type and its constructor to the context
@@ -63,11 +68,11 @@ addInd :: PInductive -> PIRContext -> Either Error PIRContext
 addInd (PInductive name args ind_constrs) ctx = do
   ctx_with_ind <- addIndType name ctx
   let ctx_with_args = Prelude.foldl (\ctx' (arg_name, _) -> addLocalVar arg_name ctx') ctx_with_ind args
-  PIRContext _ def inds constrs <-
+  ctx' <-
     foldM (\ctx' (idx, PInductiveConstructor constr _) ->
               addIndConstr name constr idx ctx')
           ctx_with_args (zip [0..] ind_constrs)
-  return $ PIRContext (pirctx_local ctx) def inds constrs
+  return $ pirctx_local .~ (ctx^.pirctx_local) $ ctx'
 
 -- Add all definitions and declarations to the context
 getProgramCtx :: Parser.Program -> Either Error PIRContext

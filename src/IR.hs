@@ -1,6 +1,9 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module IR where
 
 import Data.Map
+import Control.Lens
 
 data ConstType
   = IntConst Int
@@ -46,17 +49,20 @@ data Inductive = Inductive
   , ind_constr :: [InductiveConstructor] }
 
 data Program = Program
-  { prog_defs :: Map String Definition
-  , prog_inds :: Map String Inductive }
+  { _prog_defs :: Map String Definition
+  , _prog_inds :: Map String Inductive }
+
+makeLenses ''Program
 
 insertDefinition :: Definition -> Program -> Program
-insertDefinition def (Program defs inds) = Program (insert (def_name def) def defs) inds
+--insertDefinition def (Program defs inds) = Program (insert (def_name def) def defs) inds
+insertDefinition def = prog_defs %~ insert (def_name def) def
 
 insertInductive :: Inductive -> Program -> Program
-insertInductive ind (Program defs inds) = Program defs (insert (ind_name ind) ind inds)
+insertInductive ind = prog_inds %~ insert (ind_name ind) ind
 
 getDefinition :: String -> Program -> Definition
-getDefinition ident (Program defs _) = defs ! ident
+getDefinition ident p = (p^.prog_defs) ! ident
 
 getInductive :: String -> Program -> Inductive
-getInductive ident (Program _ inds) = inds ! ident
+getInductive ident p = (p^.prog_inds) ! ident
