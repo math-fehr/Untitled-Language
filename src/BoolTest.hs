@@ -40,4 +40,4 @@ runBooleanDef p def =
 
 -- Run every boolean definition with all possible combinations of arguments
 runBooleanProgram :: Program -> IO ()
-runBooleanProgram p = foldM (\_ def -> (putStrLn $ "Function " ++ show (def_name def)) >> runBooleanDef p def >> putStrLn "") () (prog_defs p)
+runBooleanProgram p = foldM (\_ def -> (putStrLn $ "Function " ++ show (def_name def)) >> runBooleanDef p def >> putStrLn "") () (_prog_defs p)
