@@ -18,6 +18,11 @@ instance Eq (DebugInfo a) where
 instance Show a => Show (DebugInfo a) where
   show (DI x) = show x
 
+data MatchCase = MatchCase
+  { case_args   :: [DebugInfo String],
+    case_expr   :: Expr
+  } deriving (Eq, Show)
+
 data Expr
   = LocalVar (DebugInfo String) Int
   | Def String -- Definition
@@ -26,6 +31,7 @@ data Expr
   | Const ConstType
   | Assign (DebugInfo String) Expr Expr
   | IfThenElse Expr Expr Expr
+  | Match Expr String [MatchCase]
   | Call Expr Expr
   | Lambda (DebugInfo String) Expr Expr
   | Arrow Expr Expr

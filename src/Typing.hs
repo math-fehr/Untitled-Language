@@ -53,6 +53,23 @@ getConstType (IntConst _) = Const IntType
 getConstType IntType = Type
 getConstType BoolType = Type
 
+-- Check that the term in a branch of a pattern matching is well typed
+checkCaseWellTyped :: TypingContext -> Program -> String -> MatchCase -> Either Error Expr
+checkCaseWellTyped ctx p ind_name (MatchCase args expr) =
+  let ind = getInductive ind_name p
+      ctx' = foldl (flip addVarType) ctx (snd <$> (ind_args ind)) in
+    checkExprWellTyped ctx' p expr
+
+-- Check that the term in a branch of a pattern matching is well typed,
+-- and that its type is equal to some given type
+checkCaseWellTypedHasType :: TypingContext -> Program -> String -> MatchCase -> Expr -> Either Error ()
+checkCaseWellTypedHasType ctx p ind_name e expected_typ =
+  do typ <- checkCaseWellTyped ctx p ind_name e
+     if expected_typ == typ then
+       return ()
+     else
+       Left $ ShouldBeType (case_expr e) typ expected_typ
+
 -- Check that the term is well typed, and return its type
 checkExprWellTyped :: TypingContext -> Program -> Expr -> Either Error Expr
 checkExprWellTyped ctx _ (LocalVar _ idx) = return $ getVarType idx ctx
@@ -68,6 +85,13 @@ checkExprWellTyped ctx p (IfThenElse cond e1 e2) =
      e1_type <- checkExprWellTyped ctx p e1
      checkExprWellTypedHasType ctx p e2 e1_type
      return $ e1_type
+checkExprWellTyped _ _ (Match _ _ []) = error "Can't check type of a pattern matching with no cases"
+checkExprWellTyped ctx p (Match expr ind_name (hd_cases : cases)) =
+  do checkExprWellTypedHasType ctx p expr (InductiveType ind_name)
+     typ <- checkCaseWellTyped ctx p ind_name hd_cases
+     traverse_ (\x -> checkCaseWellTypedHasType ctx p ind_name x typ) cases
+     return typ
+
 checkExprWellTyped ctx p (Call fun arg) =
   do fun_typ <- checkExprWellTyped ctx p fun
      case fun_typ of

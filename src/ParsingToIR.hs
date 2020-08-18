@@ -5,6 +5,7 @@ module ParsingToIR where
 import           IR
 import           Parser
 import           Data.List
+import qualified Data.List     as L
 import           Data.Map
 import qualified Data.Map      as M
 import           Data.Set         (Set)
@@ -13,30 +14,39 @@ import           Data.Maybe
 import           Error
 import           Control.Monad
 import           Control.Lens
+import           Utils
 
 -- Local variable context
 data PIRContext = PIRContext
   { _pirctx_local  :: [String]
   , _pirctx_def    :: Set String
-  , _pirctx_ind    :: Set String
+  , _pirctx_ind    :: Map String [String]
   , _pirctx_constr :: Map String (String, Int) }
 
 makeLenses ''PIRContext
 
 -- An empty context
 emptyCtx :: PIRContext
-emptyCtx = PIRContext [] S.empty S.empty M.empty
+emptyCtx = PIRContext [] S.empty M.empty M.empty
 
 -- Get an expression from an identifier
 getExprFromIdent :: String -> PIRContext -> Maybe IR.Expr
 getExprFromIdent str (PIRContext local def ind constrs)
   | str `elem`     local  = LocalVar (DI str) <$> elemIndex str local
   | str `S.member` def    = Just $ Def str
-  | str `S.member` ind    = Just $ InductiveType str
+  | str `M.member` ind    = Just $ InductiveType str
   | str `M.member` constrs =
     let (constr, idx) = constrs ! str in
       Just $ Constructor constr idx
   | otherwise = Nothing
+
+-- Get the type of a constructor, and its constructor id
+getConstructorId :: String -> PIRContext -> Maybe (String, Int)
+getConstructorId str ctx = M.lookup str (ctx^.pirctx_constr)
+
+-- Get the constructors of an inductive
+getConstructors :: String -> PIRContext -> [String]
+getConstructors str ctx = (ctx^.pirctx_ind) ! str
 
 -- Add a local variable with de bruijn index 0 to the context
 addLocalVar :: String -> PIRContext -> PIRContext
@@ -50,10 +60,10 @@ addDef str ctx
   | otherwise = Left $ DuplicateDefinition str
 
 -- Add an inductive type to the context
-addIndType :: String -> PIRContext ->  Either Error PIRContext
-addIndType str ctx
+addIndType :: String -> [String] -> PIRContext ->  Either Error PIRContext
+addIndType str constrs ctx
   | isNothing $ getExprFromIdent str ctx =
-    return $ pirctx_ind %~ (S.insert str) $ ctx
+    return $ pirctx_ind %~ (M.insert str constrs) $ ctx
   | otherwise = Left $ DuplicateDefinition str
 
 -- Add an inductive constructor to the context
@@ -66,7 +76,7 @@ addIndConstr ind constr idx ctx
 -- Add an inductive type and its constructor to the context
 addInd :: PInductive -> PIRContext -> Either Error PIRContext
 addInd (PInductive name args ind_constrs) ctx = do
-  ctx_with_ind <- addIndType name ctx
+  ctx_with_ind <- addIndType name ((^.pconstr_name) <$> ind_constrs) ctx
   let ctx_with_args = Prelude.foldl (\ctx' (arg_name, _) -> addLocalVar arg_name ctx') ctx_with_ind args
   ctx' <-
     foldM (\ctx' (idx, PInductiveConstructor constr _) ->
@@ -79,6 +89,28 @@ getProgramCtx :: Parser.Program -> Either Error PIRContext
 getProgramCtx [] = return emptyCtx
 getProgramCtx (InductiveDecl  ind : p) = getProgramCtx p >>= addInd ind
 getProgramCtx (DefinitionDecl d   : p) = getProgramCtx p >>= addDef (pdef_name d)
+
+-- Transform a case in a match to an IR case, with a constructor identifier
+matchCaseToIr :: PMatchCase -> PIRContext -> Either Error (String, Int, MatchCase)
+matchCaseToIr (PMatchCase constr args expr) ctx =
+  case getConstructorId constr ctx of
+    Just (typ, idx) -> let ctx' = L.foldl (flip addLocalVar) ctx args in
+                         do expr' <- exprToIr expr ctx'
+                            return $ (typ, idx, MatchCase (DI <$> args) expr')
+    Nothing -> Left $ ExpectedConstrutor constr
+
+-- Check that a pattern match has the correct number of constructors
+checkMatchList :: [(String, Int, MatchCase)] -> PIRContext -> Either Error (String, [MatchCase])
+checkMatchList [] _ = Left NoCases
+checkMatchList cases ctx
+  | not $ all ((== ind_name) <$> (^._1)) cases = Left MatchHeterogeneous
+  | Just i <- missingInRange constrs_id n_constrs = Left $ MissingCase (constrs !! i)
+  | Just i <- duplicate constrs_id = Left $ DuplicateCase (constrs !! i)
+  | otherwise = return (ind_name, (^._3) <$> fromJust <$> (\x -> find ((==x) <$> (^._2)) cases) <$> [0..(n_constrs - 1)])
+  where (ind_name, _, _) = head cases
+        constrs_id = (^._2) <$> cases
+        n_constrs = length constrs_id
+        constrs = getConstructors ind_name ctx
 
 -- Transform a parsed expression to an IR expression
 exprToIr :: Parser.Expr -> PIRContext -> Either Error IR.Expr
@@ -103,6 +135,11 @@ exprToIr (Parser.IfThenElse c e1 e2) ctx =
      e1' <- exprToIr e1 ctx
      e2' <- exprToIr e2 ctx
      return $ IR.IfThenElse c' e1' e2'
+exprToIr (Parser.Match e cases) ctx =
+  do e' <- exprToIr e ctx
+     cases' <- mapM (flip matchCaseToIr ctx) cases
+     (ind_type, ordered_cases) <- checkMatchList cases' ctx
+     return $ IR.Match e' ind_type ordered_cases
 exprToIr (Parser.Arrow e1 e2) ctx =
   do e1' <- exprToIr e1 ctx
      e2' <- exprToIr e2 ctx

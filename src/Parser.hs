@@ -1,11 +1,20 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module Parser where
 
-import System.IO()
-import Control.Monad
-import Text.ParserCombinators.Parsec
-import Text.ParserCombinators.Parsec.Expr
-import Text.ParserCombinators.Parsec.Language
-import qualified Text.ParserCombinators.Parsec.Token as Token
+import           System.IO()
+import           Control.Monad
+import           Text.ParserCombinators.Parsec
+import           Text.ParserCombinators.Parsec.Expr
+import           Text.ParserCombinators.Parsec.Language
+import qualified Text.ParserCombinators.Parsec.Token    as Token
+import           Control.Lens
+
+data PMatchCase = PMatchCase
+  { pcase_constr :: String
+  , pcase_args   :: [String]
+  , pcase_expr   :: Expr
+  } deriving(Show)
 
 -- Parsed AST
 data Expr =
@@ -17,6 +26,7 @@ data Expr =
   | IfThenElse Expr Expr Expr
   | Arrow Expr Expr
   | Lambda String Expr Expr
+  | Match Expr [PMatchCase]
   deriving(Show)
 
 data PDefinition = PDefinition
@@ -27,13 +37,16 @@ data PDefinition = PDefinition
   } deriving(Show)
 
 data PInductiveConstructor = PInductiveConstructor
-  { pconstr_name :: String
-  , pconstr_args :: [(String, Expr)] }
+  { _pconstr_name :: String
+  , _pconstr_args :: [(String, Expr)] }
 
 data PInductive = PInductive
-  { pind_name   :: String
-  , pind_args   :: [(String, Expr)]
-  , pind_constr :: [PInductiveConstructor] }
+  { _pind_name   :: String
+  , _pind_args   :: [(String, Expr)]
+  , _pind_constr :: [PInductiveConstructor] }
+
+makeLenses ''PInductive
+makeLenses ''PInductiveConstructor
 
 data DeclarationType =
     InductiveDecl  PInductive
@@ -57,9 +70,12 @@ languageDef =
                                      , "if"
                                      , "then"
                                      , "else"
+                                     , "match"
+                                     , "with"
+                                     , "end"
                                      ]
            , Token.reservedOpNames = ["+", "-", "*", "/", ":="
-                                     , "<", ">", "->", "|"
+                                     , "<", ">", "->", "|", "=>"
                                      ]
            }
 
@@ -90,7 +106,7 @@ lambdaParser :: Parser Expr
 lambdaParser =
   do reserved "fun"
      (var, typ) <- typedVarParser
-     reserved "=>"
+     reservedOp "=>"
      body <- exprParser
      return $ Lambda var typ body
 
@@ -113,6 +129,23 @@ ifParser = do reserved "if"
               falseCase <- exprParser
               return $ IfThenElse cond trueCase falseCase
 
+-- Parse a case in a pattern match
+caseParser :: Parser PMatchCase
+caseParser = do reserved "|"
+                (constr : args) <- many1 identifier
+                reservedOp "=>"
+                expr <- exprParser
+                return $ PMatchCase constr args expr
+
+-- parse a pattern matching expression
+matchParser :: Parser Expr
+matchParser = do reserved "match"
+                 expr <- exprParser
+                 reserved "with"
+                 cases <- many caseParser
+                 reserved "end"
+                 return $ Match expr cases
+
 opParser :: Parser Expr
 opParser = buildExpressionParser operatorsList expr2Parser
 
@@ -132,10 +165,11 @@ expr1Parser = opParser
 
 -- Parse expressions with precedence 0
 exprParser :: Parser Expr
-exprParser = ifParser
+exprParser = callParser
          <|> assignParser
+         <|> ifParser
+         <|> matchParser
          <|> lambdaParser
-         <|> callParser
 
 -- Parse a variable that has a type
 typedVarParser :: Parser (String, Expr)

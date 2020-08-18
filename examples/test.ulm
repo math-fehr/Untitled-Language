@@ -2,6 +2,12 @@ enum bool2 :=
 | true2
 | false2
 
+def not2 (a: bool2) : bool2 :=
+    match a with
+    | true2 => false2
+    | false2 => true2
+    end
+
 def not (a: bool) : bool :=
     if a then false else true
 
