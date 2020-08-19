@@ -47,16 +47,19 @@ data Definition = Definition
 
 data InductiveConstructor = InductiveConstructor
   { constr_name :: String
-  , constr_args :: [(String, Expr)] }
+  , constr_args :: [(String, Expr)]
+  } deriving(Show)
 
 data Inductive = Inductive
   { ind_name   :: String
   , ind_args   :: [(String, Expr)]
-  , ind_constr :: [InductiveConstructor] }
+  , ind_constr :: [InductiveConstructor]
+  } deriving(Show)
 
 data Program = Program
   { _prog_defs :: Map String Definition
-  , _prog_inds :: Map String Inductive }
+  , _prog_inds :: Map String Inductive
+  } deriving(Show)
 
 makeLenses ''Program
 
