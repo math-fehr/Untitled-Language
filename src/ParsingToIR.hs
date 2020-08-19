@@ -177,7 +177,7 @@ indToIr (PInductive name args constr) ctx = do
   (args', ctx') <- argsToIr args ctx
   constr' <- foldM (\l constr' -> (:l) <$> constrToIr constr' ctx')
                    [] constr
-  return $ Inductive name args' constr'
+  return $ Inductive name args' (reverse constr')
 
 -- Parse a parsed program to an IR program
 parsedProgramToIr :: Parser.Program -> Either Error IR.Program
