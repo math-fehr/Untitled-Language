@@ -14,7 +14,7 @@ data PMatchCase = PMatchCase
   { pcase_constr :: String
   , pcase_args   :: [String]
   , pcase_expr   :: Expr
-  } deriving(Show)
+  } deriving(Show,Eq)
 
 -- Parsed AST
 data Expr =
@@ -27,14 +27,14 @@ data Expr =
   | Arrow Expr Expr
   | Lambda String Expr Expr
   | Match Expr [PMatchCase]
-  deriving(Show)
+  deriving(Show,Eq)
 
 data PDefinition = PDefinition
   { pdef_name :: String
   , pdef_args :: [(String, Expr)]
   , pdef_body :: Expr
   , pdef_type :: Expr
-  } deriving(Show)
+  } deriving(Show,Eq)
 
 data PInductiveConstructor = PInductiveConstructor
   { _pconstr_name :: String
