@@ -20,21 +20,24 @@ getVarType idx (TypingContext ctx) = ctx !! idx
 addVarType :: Expr -> TypingContext -> TypingContext
 addVarType e (TypingContext l) = TypingContext $ e : l
 
--- Check and get the term of a succession of arrows represented by an expression list
+-- Concatenate all arguments imbricated arrows
 -- [bool; int; string] is representing bool -> (int -> string)
-checkBigArrow :: TypingContext -> Program -> [Expr] -> Either Error Expr
-checkBigArrow _ _ [] = error "Compiler error: call of checkBigArrow with an empty list"
-checkBigArrow ctx p [e] = checkExprWellTypedHasType ctx p e Type >> return e
-checkBigArrow ctx p (e1 : e2 : es) =
-  do checkExprWellTypedHasType ctx p e1 Type
-     esArrow <- checkBigArrow (addVarType e1 ctx) p (e2 : es)
-     return $ Arrow e1 esArrow
+getBigArrow :: [Expr] -> Expr
+getBigArrow [] = error "Compiler error: call of getBigArrow with an empty list"
+getBigArrow [e] = e
+getBigArrow (e1 : e2 : es) = Arrow e1 (getBigArrow (e2 : es))
+
+-- Check and get the term of a succession of arrows represented by an expression list
+checkBigArrowWellTyped :: TypingContext -> Program -> [Expr] -> Either Error Expr
+checkBigArrowWellTyped ctx p es =
+  do checkExprWellTypedHasType ctx p (getBigArrow es) Type
+     return $ getBigArrow es
 
 -- Check that the type of a definition is well typed, and return the type
 -- Does not check if the body is well typed
 checkDefTypeWellTyped :: Definition -> Program -> Either Error Expr
 checkDefTypeWellTyped (Definition _ args typ _) p =
-  checkBigArrow emptyCtx p (fmap snd args ++ [typ])
+  checkBigArrowWellTyped emptyCtx p (fmap snd args ++ [typ])
 
 -- Check that an expression is well typed, and that its type is equal to
 -- some given type
@@ -121,22 +124,18 @@ checkDefWellTyped' ctx p (Definition name ((_, arg) : args) typ body) =
      return $ Arrow arg def_typ
 
 -- Check that an inductive constructor declaration is well typed
-checkIndConstrWellTyped :: TypingContext -> Program -> InductiveConstructor -> Either Error ()
-checkIndConstrWellTyped ctx p (InductiveConstructor _ args) =
-  foldM (\ctx' (_, arg) ->
-           checkExprWellTypedHasType ctx' p arg Type >>
-           (return $ addVarType arg ctx'))
-        ctx args
-  >> return ()
+checkIndConstrWellTyped :: TypingContext -> Program -> String -> InductiveConstructor -> Either Error Expr
+checkIndConstrWellTyped ctx p ind_name (InductiveConstructor _ args) =
+  checkBigArrowWellTyped ctx p ((snd <$> args) ++ [InductiveType ind_name])
 
 -- Check that an inductive declaration is well typed
 checkIndWellTyped :: Program -> Inductive -> Either Error ()
-checkIndWellTyped p (Inductive _ args constr) = do
+checkIndWellTyped p (Inductive ind_name args constr) = do
   ctx <- foldM (\ctx (_, arg) ->
                   checkExprWellTypedHasType ctx p arg Type >>
                   (return $ addVarType arg ctx))
                emptyCtx args
-  traverse_ (checkIndConstrWellTyped ctx p) constr
+  traverse_ (checkIndConstrWellTyped ctx p ind_name) constr
 
 -- Check that the definition is well typed, and return its type
 checkDefWellTyped :: Program -> Definition -> Either Error Expr
