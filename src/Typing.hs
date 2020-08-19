@@ -4,6 +4,7 @@ import IR
 import Error
 import Data.Foldable
 import Control.Monad
+import Control.Lens ((^.))
 
 -- A context of variable types
 newtype TypingContext = TypingContext [Expr]
@@ -71,7 +72,7 @@ checkCaseWellTypedHasType ctx p ind_name e expected_typ =
      if expected_typ == typ then
        return ()
      else
-       Left $ ShouldBeType (case_expr e) typ expected_typ
+       Left $ ShouldBeType (e^.case_expr) typ expected_typ
 
 -- Check that the term is well typed, and return its type
 checkExprWellTyped :: TypingContext -> Program -> Expr -> Either Error Expr

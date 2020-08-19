@@ -19,8 +19,8 @@ instance Show a => Show (DebugInfo a) where
   show (DI x) = show x
 
 data MatchCase = MatchCase
-  { case_args   :: [DebugInfo String],
-    case_expr   :: Expr
+  { _case_args   :: [DebugInfo String],
+    _case_expr   :: Expr
   } deriving (Eq, Show)
 
 data Expr
@@ -62,6 +62,7 @@ data Program = Program
   } deriving(Show)
 
 makeLenses ''Program
+makeLenses ''MatchCase
 
 insertDefinition :: Definition -> Program -> Program
 --insertDefinition def (Program defs inds) = Program (insert (def_name def) def defs) inds
