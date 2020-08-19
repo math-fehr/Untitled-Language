@@ -73,6 +73,7 @@ languageDef =
                                      , "match"
                                      , "with"
                                      , "end"
+                                     , "enum"
                                      ]
            , Token.reservedOpNames = ["+", "-", "*", "/", ":="
                                      , "<", ">", "->", "|", "=>"
