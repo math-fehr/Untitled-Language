@@ -78,7 +78,8 @@ checkExprWellTyped :: TypingContext -> Program -> Expr -> Either Error Expr
 checkExprWellTyped ctx _ (LocalVar _ idx) = return $ getVarType idx ctx
 checkExprWellTyped _ p (Def d) = checkDefTypeWellTyped (getDefinition d p) p
 checkExprWellTyped _ _ (InductiveType _) = return Type
-checkExprWellTyped _ _ (Constructor s _) = return $ InductiveType s
+checkExprWellTyped ctx p (Constructor s idx) =
+  checkBigArrowWellTyped ctx p $ (snd <$> (constr_args $ (ind_constr (getInductive s p)) !! idx)) ++ [InductiveType s]
 checkExprWellTyped _ _ (Const c) = return $ getConstType c
 checkExprWellTyped ctx p (Assign _ sub_e e) =
   do sub_e_type <- checkExprWellTyped ctx p sub_e
