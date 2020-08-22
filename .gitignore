@@ -3,3 +3,6 @@ dist*
 result
 *.local
 *_flymake.hs
+stack.yaml
+.stack-work
+stack.yaml.lock
