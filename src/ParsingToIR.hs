@@ -98,39 +98,6 @@ getProgramCtx [] = return emptyCtx
 getProgramCtx (InductiveDecl ind:p) = getProgramCtx p >>= addInd ind
 getProgramCtx (DefinitionDecl d:p) = getProgramCtx p >>= addDef (pdef_name d)
 
--- Transform a case in a match to an IR case, with a constructor identifier
-matchCaseToIr ::
-     PMatchCase -> PIRContext -> Either Error (String, Int, MatchCase)
-matchCaseToIr (PMatchCase constr args expr) ctx =
-  case getConstructorId constr ctx of
-    Just (typ, idx) ->
-      let ctx' = L.foldl (flip addLocalVar) ctx args
-       in do expr' <- exprToIr expr ctx'
-             return $ (typ, idx, MatchCase (DI <$> args) expr')
-    Nothing -> Left $ ExpectedConstrutor constr
-
--- Check that a pattern match has the correct number of constructors
-checkMatchList ::
-     [(String, Int, MatchCase)]
-  -> PIRContext
-  -> Either Error (String, [MatchCase])
-checkMatchList [] _ = Left NoCases
-checkMatchList cases ctx
-  | not $ all ((== ind_name) <$> (^. _1)) cases = Left MatchHeterogeneous
-  | Just i <- missingInRange constrs_id n_constrs =
-    Left $ MissingCase (constrs !! i)
-  | Just i <- duplicate constrs_id = Left $ DuplicateCase (constrs !! i)
-  | otherwise =
-    return
-      ( ind_name
-      , (^. _3) <$> fromJust <$> (\x -> find ((== x) <$> (^. _2)) cases) <$>
-        [0 .. (n_constrs - 1)])
-  where
-    (ind_name, _, _) = head cases
-    constrs_id = (^. _2) <$> cases
-    n_constrs = length constrs_id
-    constrs = getConstructors ind_name ctx
-
 -- Transform a parsed expression to an IR expression
 exprToIr :: Parser.Expr -> PIRContext -> Either Error IR.Expr
 exprToIr (Var "bool") _ = return $ IR.Const BoolType
@@ -154,11 +121,6 @@ exprToIr (Parser.IfThenElse c e1 e2) ctx = do
   e1' <- exprToIr e1 ctx
   e2' <- exprToIr e2 ctx
   return $ IR.IfThenElse c' e1' e2'
-exprToIr (Parser.Match e cases) ctx = do
-  e' <- exprToIr e ctx
-  cases' <- mapM (flip matchCaseToIr ctx) cases
-  (ind_type, ordered_cases) <- checkMatchList cases' ctx
-  return $ IR.Match e' ind_type ordered_cases
 exprToIr (Parser.Arrow e1 e2) ctx = do
   e1' <- exprToIr e1 ctx
   e2' <- exprToIr e2 ctx

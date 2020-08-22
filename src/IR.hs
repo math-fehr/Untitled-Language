@@ -22,72 +22,45 @@ instance Eq (DebugInfo a) where
 instance Show a => Show (DebugInfo a) where
   show (DI x) = show x
 
-data MatchCase =
-  MatchCase
-    { _case_args :: [DebugInfo String]
-    , _case_expr :: Expr
-    }
-  deriving (Eq, Show)
+data Builtins = Product
+              | Sum
+              | Ampersand
+              | LinearArrow
+              | UnrestrictedArrow
+              deriving (Eq, Show)
 
 data Expr
   = LocalVar (DebugInfo String) Int
+  | Builtin Builtins
   | Def String -- Definition
-  | InductiveType String
-  | Constructor String Int
   | Const ConstType
   | Assign (DebugInfo String) Expr Expr
   | IfThenElse Expr Expr Expr
-  | Match Expr String [MatchCase]
   | Call Expr Expr
-  | Lambda (DebugInfo String) Expr Expr
-  | Arrow Expr Expr
+  | Lambda (DebugInfo String) Arg Expr
   | Type
-  deriving (Eq, Show)
+  deriving (Eq,Show)
 
-data Definition =
-  Definition
-    { def_name :: String
-    , def_args :: [(String, Expr)] -- Names for debug purposes
-    , def_type :: Expr
-    , def_body :: Expr
-    }
-  deriving (Show)
+data Arg = UnrestrictedArg Expr
+         | LinearArg       Expr
+         deriving (Eq,Show)
 
-data InductiveConstructor =
-  InductiveConstructor
-    { constr_name :: String
-    , constr_args :: [(String, Expr)]
-    }
-  deriving (Show)
+data Definition = Definition
+  { def_name :: String
+  , def_args :: [(DebugInfo String, Arg)]
+  , def_type :: Expr
+  , def_body :: Expr
+  } deriving(Eq,Show)
 
-data Inductive =
-  Inductive
-    { ind_name :: String
-    , ind_args :: [(String, Expr)]
-    , ind_constr :: [InductiveConstructor]
-    }
-  deriving (Show)
-
-data Program =
-  Program
-    { _prog_defs :: Map String Definition
-    , _prog_inds :: Map String Inductive
-    }
-  deriving (Show)
+data Program = Program
+  { _prog_defs :: Map String Definition
+  } deriving(Show)
 
 makeLenses ''Program
-
-makeLenses ''MatchCase
 
 insertDefinition :: Definition -> Program -> Program
 --insertDefinition def (Program defs inds) = Program (insert (def_name def) def defs) inds
 insertDefinition def = prog_defs %~ M.insert (def_name def) def
 
-insertInductive :: Inductive -> Program -> Program
-insertInductive ind = prog_inds %~ M.insert (ind_name ind) ind
-
 getDefinition :: String -> Program -> Definition
-getDefinition ident p = (p ^. prog_defs) M.! ident
-
-getInductive :: String -> Program -> Inductive
-getInductive ident p = (p ^. prog_inds) M.! ident
+getDefinition ident p = (p^.prog_defs) M.! ident
