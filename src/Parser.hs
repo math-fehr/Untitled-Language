@@ -9,59 +9,35 @@ import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
 import Text.ParserCombinators.Parsec.Language
 import qualified Text.ParserCombinators.Parsec.Token as Token
+import Control.Lens
 
-data PMatchCase =
-  PMatchCase
-    { pcase_constr :: String
-    , pcase_args :: [String]
-    , pcase_expr :: Expr
-    }
-  deriving (Show, Eq)
+data BinOp = BPlus
+           | BTimes
+           | BAmpersand
+           | BUnrestrictedArrow
+           | BLinearArrow
+           deriving (Show,Eq)
 
 -- Parsed AST
-data Expr
-  = Var String
+data Expr =
+    Var String
+  | TypedVar String Expr
   | IntConst Int
   | BoolConst Bool
   | Assign String Expr Expr
   | Call Expr Expr
   | IfThenElse Expr Expr Expr
-  | Arrow Expr Expr
   | Lambda String Expr Expr
   | Match Expr [PMatchCase]
   deriving (Show, Eq)
 
-data PDefinition =
-  PDefinition
-    { pdef_name :: String
-    , pdef_args :: [(String, Expr)]
-    , pdef_body :: Expr
-    , pdef_type :: Expr
-    }
-  deriving (Show, Eq)
+data PDefinition = PDefinition
+  { pdef_name :: String
+  , pdef_body :: Expr
+  , pdef_type :: Expr
+  } deriving(Show,Eq)
 
-data PInductiveConstructor =
-  PInductiveConstructor
-    { _pconstr_name :: String
-    , _pconstr_args :: [(String, Expr)]
-    }
-
-data PInductive =
-  PInductive
-    { _pind_name :: String
-    , _pind_args :: [(String, Expr)]
-    , _pind_constr :: [PInductiveConstructor]
-    }
-
-makeLenses ''PInductive
-
-makeLenses ''PInductiveConstructor
-
-data DeclarationType
-  = InductiveDecl PInductive
-  | DefinitionDecl PDefinition
-
-type Program = [DeclarationType]
+type Program = [PDefinition]
 
 -- Lexer
 languageDef =
@@ -87,7 +63,7 @@ languageDef =
         , "enum"
         ]
     , Token.reservedOpNames =
-        ["+", "-", "*", "/", ":=", "<", ">", "->", "|", "=>"]
+        ["+", "-", "*", "/", ":=", "&", "<", ">", "->", "|", "=>", "-o"]
     }
 
 lexer = Token.makeTokenParser languageDef
@@ -120,12 +96,12 @@ assignParser = do
 
 -- Parse lambda functions
 lambdaParser :: Parser Expr
-lambdaParser = do
-  reserved "fun"
-  (var, typ) <- typedVarParser
-  reservedOp "=>"
-  body <- exprParser
-  return $ Lambda var typ body
+lambdaParser =
+  do reserved "fun"
+     (var, typ) <- parens typedVarParser
+     reservedOp "=>"
+     body <- exprParser
+     return $ Lambda var typ body
 
 exprListToCall :: [Expr] -> Expr
 exprListToCall = foldl1 Call
@@ -147,36 +123,30 @@ ifParser = do
   falseCase <- exprParser
   return $ IfThenElse cond trueCase falseCase
 
--- Parse a case in a pattern match
-caseParser :: Parser PMatchCase
-caseParser = do
-  reserved "|"
-  (constr:args) <- many1 identifier
-  reservedOp "=>"
-  expr <- exprParser
-  return $ PMatchCase constr args expr
-
--- parse a pattern matching expression
-matchParser :: Parser Expr
-matchParser = do
-  reserved "match"
-  expr <- exprParser
-  reserved "with"
-  cases <- many caseParser
-  reserved "end"
-  return $ Match expr cases
-
 opParser :: Parser Expr
 opParser = buildExpressionParser operatorsList expr2Parser
+  
+builtinOp :: String -> Parser (Expr -> Expr -> Expr)
+builtinOp op = reservedOp op >> return (\x1 x2 -> Call (Call (Var op) x1) x2)
 
-operatorsList = [[Infix (reservedOp "->" >> return Arrow) AssocLeft]]
+operatorsList = [ [ Infix (builtinOp "+")  AssocLeft
+                  , Infix (builtinOp "*")  AssocLeft
+                  , Infix (builtinOp "&")  AssocLeft ]  
+                , [ Infix (builtinOp "->") AssocRight
+                  , Infix (builtinOp "-o") AssocRight ]
+                ]
+  
+varParser :: Parser Expr
+varParser = identifier >>= \name ->
+                (TypedVar name <$> (reservedOp ":" >> exprParser))
+            <|> return (Var name)
 
 -- Parse expressions with precedence 2
 expr2Parser :: Parser Expr
-expr2Parser =
-  parens exprParser <|> Var <$> identifier <|>
-  (IntConst . fromInteger) <$> integer <|>
-  BoolConst <$> boolParser
+expr2Parser = parens exprParser
+          <|> varParser
+          <|> (IntConst . fromInteger) <$> integer
+          <|> BoolConst <$> boolParser
 
 -- Parse expressions with precedence 1
 expr1Parser :: Parser Expr
@@ -184,55 +154,36 @@ expr1Parser = opParser <|> expr2Parser
 
 -- Parse expressions with precedence 0
 exprParser :: Parser Expr
-exprParser =
-  callParser <|> assignParser <|> ifParser <|> matchParser <|> lambdaParser
+exprParser = callParser
+         <|> assignParser
+         <|> ifParser
+         <|> lambdaParser
+         <|> expr1Parser
 
 -- Parse a variable that has a type
 typedVarParser :: Parser (String, Expr)
-typedVarParser =
-  parens
-    (do name <- identifier
-        reservedOp ":"
-        typ <- exprParser
-        return (name, typ))
+typedVarParser = do name <- identifier
+                    reservedOp ":"
+                    typ <- exprParser
+                    return (name, typ)
 
-definitionParser :: Parser DeclarationType
-definitionParser = do
-  reserved "def"
-  name <- identifier
-  args <- (many typedVarParser)
-  reservedOp ":"
-  typ <- exprParser
-  reservedOp ":="
-  body <- exprParser
-  return $ DefinitionDecl $ PDefinition name args body typ
-
--- An inductive constructor parser
-inductiveConstructorParser :: Parser PInductiveConstructor
-inductiveConstructorParser = do
-  reservedOp "|"
-  name <- identifier
-  args <- (many typedVarParser)
-  return $ PInductiveConstructor name args
-
--- An inductive parser
-inductiveParser :: Parser DeclarationType
-inductiveParser = do
-  reserved "enum"
-  name <- identifier
-  args <- (many typedVarParser)
-  reservedOp ":="
-  constructors <- many inductiveConstructorParser
-  return $ InductiveDecl $ PInductive name args constructors
+definitionParser :: Parser PDefinition
+definitionParser = do reserved "def"
+                      name <- identifier
+                      reservedOp ":"
+                      typ <- exprParser
+                      reservedOp ":="
+                      body <- exprParser
+                      return $ PDefinition name body typ
 
 -- Main parser
 programParser :: Parser Program
-programParser = whiteSpace >> many (definitionParser <|> inductiveParser)
+programParser = whiteSpace >> many definitionParser
 
 -- Parse a file
 parseFile :: String -> IO Program
-parseFile file = do
-  program <- readFile file
-  case parse programParser "" program of
-    Left e -> print e >> fail "parse error"
-    Right r -> return r
+parseFile file = do program <- readFile file
+                    case parse programParser "" program of
+                      Left e -> print e >> fail "parse error"
+                      Right r -> return r
+  
