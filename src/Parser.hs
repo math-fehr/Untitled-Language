@@ -28,7 +28,6 @@ data Expr =
   | Call Expr Expr
   | IfThenElse Expr Expr Expr
   | Lambda String Expr Expr
-  | Match Expr [PMatchCase]
   deriving (Show, Eq)
 
 data PDefinition = PDefinition
