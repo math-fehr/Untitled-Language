@@ -6,7 +6,7 @@ import           IR
 import           Parser
 import           Data.List
 import qualified Data.List     as L
-import           Data.Map
+import           Data.Map         (Map)
 import qualified Data.Map      as M
 import           Data.Set         (Set)
 import qualified Data.Set      as S
@@ -36,7 +36,7 @@ getExprFromIdent str (PIRContext local def ind constrs)
   | str `S.member` def    = Just $ Def str
   | str `M.member` ind    = Just $ InductiveType str
   | str `M.member` constrs =
-    let (constr, idx) = constrs ! str in
+    let (constr, idx) = constrs M.! str in
       Just $ Constructor constr idx
   | otherwise = Nothing
 
@@ -46,7 +46,7 @@ getConstructorId str ctx = M.lookup str (ctx^.pirctx_constr)
 
 -- Get the constructors of an inductive
 getConstructors :: String -> PIRContext -> [String]
-getConstructors str ctx = (ctx^.pirctx_ind) ! str
+getConstructors str ctx = (ctx^.pirctx_ind) M.! str
 
 -- Add a local variable with de bruijn index 0 to the context
 addLocalVar :: String -> PIRContext -> PIRContext
@@ -187,4 +187,4 @@ parsedProgramToIr p =
               case decl of
                 InductiveDecl  ind -> flip insertInductive  p' <$> indToIr ind ctx
                 DefinitionDecl def -> flip insertDefinition p' <$> defToIr def ctx)
-       (IR.Program Data.Map.empty Data.Map.empty) p
+       (IR.Program M.empty M.empty) p

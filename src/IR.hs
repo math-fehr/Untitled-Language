@@ -2,7 +2,8 @@
 
 module IR where
 
-import Data.Map
+import qualified Data.Map as M
+import Data.Map (Map)
 import Control.Lens
 
 data ConstType
@@ -66,13 +67,13 @@ makeLenses ''MatchCase
 
 insertDefinition :: Definition -> Program -> Program
 --insertDefinition def (Program defs inds) = Program (insert (def_name def) def defs) inds
-insertDefinition def = prog_defs %~ insert (def_name def) def
+insertDefinition def = prog_defs %~ M.insert (def_name def) def
 
 insertInductive :: Inductive -> Program -> Program
-insertInductive ind = prog_inds %~ insert (ind_name ind) ind
+insertInductive ind = prog_inds %~ M.insert (ind_name ind) ind
 
 getDefinition :: String -> Program -> Definition
-getDefinition ident p = (p^.prog_defs) ! ident
+getDefinition ident p = (p^.prog_defs) M.! ident
 
 getInductive :: String -> Program -> Inductive
-getInductive ident p = (p^.prog_inds) ! ident
+getInductive ident p = (p^.prog_inds) M.! ident
