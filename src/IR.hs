@@ -22,12 +22,13 @@ instance Eq (DebugInfo a) where
 instance Show a => Show (DebugInfo a) where
   show (DI x) = show x
 
-data Builtins = Product
-              | Plus
-              | Ampersand
-              | LinearArrow
-              | UnrestrictedArrow
-              deriving (Eq, Show)
+data Builtins
+  = Product
+  | Plus
+  | Ampersand
+  | LinearArrow
+  | UnrestrictedArrow
+  deriving (Eq, Show)
 
 data Expr
   = LocalVar (DebugInfo String) Int
@@ -39,32 +40,37 @@ data Expr
   | Call Expr Expr
   | Lambda (DebugInfo String) Arg Expr
   | Type
-  deriving (Eq,Show)
+  deriving (Eq, Show)
 
 data Type
   = Int
   | Bool
-  | Prod     Type Type
-  | Choice   Type Type
-  | Sum      Type Type
+  | Prod Type Type
+  | Choice Type Type
+  | Sum Type Type
   | LinArrow Type Type
   | UnrArrow Type Type
-  deriving (Eq,Show,Ord)
+  deriving (Eq, Show, Ord)
 
-data Arg = UnrestrictedArg Expr
-         | LinearArg       Expr
-         deriving (Eq,Show)
+data Arg
+  = UnrestrictedArg Expr
+  | LinearArg Expr
+  deriving (Eq, Show)
 
-data Definition = Definition
-  { def_name :: String
-  , def_args :: [(DebugInfo String, Arg)]
-  , def_type :: Expr
-  , def_body :: Expr
-  } deriving(Eq,Show)
+data Definition =
+  Definition
+    { def_name :: String
+    , def_args :: [(DebugInfo String, Arg)]
+    , def_type :: Expr
+    , def_body :: Expr
+    }
+  deriving (Eq, Show)
 
-data Program = Program
-  { _prog_defs :: Map String Definition
-  } deriving(Show)
+data Program =
+  Program
+    { _prog_defs :: Map String Definition
+    }
+  deriving (Show)
 
 makeLenses ''Program
 
@@ -73,4 +79,4 @@ insertDefinition :: Definition -> Program -> Program
 insertDefinition def = prog_defs %~ M.insert (def_name def) def
 
 getDefinition :: String -> Program -> Definition
-getDefinition ident p = (p^.prog_defs) M.! ident
+getDefinition ident p = (p ^. prog_defs) M.! ident

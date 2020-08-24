@@ -3,24 +3,25 @@
 module Parser where
 
 import Control.Lens
+import Control.Lens
 import Control.Monad
 import System.IO ()
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
 import Text.ParserCombinators.Parsec.Language
 import qualified Text.ParserCombinators.Parsec.Token as Token
-import Control.Lens
 
-data BinOp = BPlus
-           | BTimes
-           | BAmpersand
-           | BUnrestrictedArrow
-           | BLinearArrow
-           deriving (Show,Eq)
+data BinOp
+  = BPlus
+  | BTimes
+  | BAmpersand
+  | BUnrestrictedArrow
+  | BLinearArrow
+  deriving (Show, Eq)
 
 -- Parsed AST
-data Expr =
-    Var String
+data Expr
+  = Var String
   | TypedVar String Expr
   | IntConst Int
   | BoolConst Bool
@@ -30,11 +31,13 @@ data Expr =
   | Lambda String Expr Expr
   deriving (Show, Eq)
 
-data PDefinition = PDefinition
-  { pdef_name :: String
-  , pdef_body :: Expr
-  , pdef_type :: Expr
-  } deriving(Show,Eq)
+data PDefinition =
+  PDefinition
+    { pdef_name :: String
+    , pdef_body :: Expr
+    , pdef_type :: Expr
+    }
+  deriving (Show, Eq)
 
 type Program = [PDefinition]
 
@@ -95,12 +98,12 @@ assignParser = do
 
 -- Parse lambda functions
 lambdaParser :: Parser Expr
-lambdaParser =
-  do reserved "fun"
-     (var, typ) <- parens typedVarParser
-     reservedOp "=>"
-     body <- exprParser
-     return $ Lambda var typ body
+lambdaParser = do
+  reserved "fun"
+  (var, typ) <- parens typedVarParser
+  reservedOp "=>"
+  body <- exprParser
+  return $ Lambda var typ body
 
 exprListToCall :: [Expr] -> Expr
 exprListToCall = foldl1 Call
@@ -124,28 +127,28 @@ ifParser = do
 
 opParser :: Parser Expr
 opParser = buildExpressionParser operatorsList expr2Parser
-  
+
 builtinOp :: String -> Parser (Expr -> Expr -> Expr)
 builtinOp op = reservedOp op >> return (\x1 x2 -> Call (Call (Var op) x1) x2)
 
-operatorsList = [ [ Infix (builtinOp "+")  AssocLeft
-                  , Infix (builtinOp "*")  AssocLeft
-                  , Infix (builtinOp "&")  AssocLeft ]  
-                , [ Infix (builtinOp "->") AssocRight
-                  , Infix (builtinOp "-o") AssocRight ]
-                ]
-  
+operatorsList =
+  [ [ Infix (builtinOp "+") AssocLeft
+    , Infix (builtinOp "*") AssocLeft
+    , Infix (builtinOp "&") AssocLeft
+    ]
+  , [Infix (builtinOp "->") AssocRight, Infix (builtinOp "-o") AssocRight]
+  ]
+
 varParser :: Parser Expr
-varParser = identifier >>= \name ->
-                (TypedVar name <$> (reservedOp ":" >> exprParser))
-            <|> return (Var name)
+varParser =
+  identifier >>= \name ->
+    (TypedVar name <$> (reservedOp ":" >> exprParser)) <|> return (Var name)
 
 -- Parse expressions with precedence 2
 expr2Parser :: Parser Expr
-expr2Parser = parens exprParser
-          <|> varParser
-          <|> (IntConst . fromInteger) <$> integer
-          <|> BoolConst <$> boolParser
+expr2Parser =
+  parens exprParser <|> varParser <|> (IntConst . fromInteger) <$> integer <|>
+  BoolConst <$> boolParser
 
 -- Parse expressions with precedence 1
 expr1Parser :: Parser Expr
@@ -153,27 +156,26 @@ expr1Parser = opParser <|> expr2Parser
 
 -- Parse expressions with precedence 0
 exprParser :: Parser Expr
-exprParser = callParser
-         <|> assignParser
-         <|> ifParser
-         <|> lambdaParser
-         <|> expr1Parser
+exprParser =
+  callParser <|> assignParser <|> ifParser <|> lambdaParser <|> expr1Parser
 
 -- Parse a variable that has a type
 typedVarParser :: Parser (String, Expr)
-typedVarParser = do name <- identifier
-                    reservedOp ":"
-                    typ <- exprParser
-                    return (name, typ)
+typedVarParser = do
+  name <- identifier
+  reservedOp ":"
+  typ <- exprParser
+  return (name, typ)
 
 definitionParser :: Parser PDefinition
-definitionParser = do reserved "def"
-                      name <- identifier
-                      reservedOp ":"
-                      typ <- exprParser
-                      reservedOp ":="
-                      body <- exprParser
-                      return $ PDefinition name body typ
+definitionParser = do
+  reserved "def"
+  name <- identifier
+  reservedOp ":"
+  typ <- exprParser
+  reservedOp ":="
+  body <- exprParser
+  return $ PDefinition name body typ
 
 -- Main parser
 programParser :: Parser Program
@@ -181,8 +183,8 @@ programParser = whiteSpace >> many definitionParser
 
 -- Parse a file
 parseFile :: String -> IO Program
-parseFile file = do program <- readFile file
-                    case parse programParser "" program of
-                      Left e -> print e >> fail "parse error"
-                      Right r -> return r
-  
+parseFile file = do
+  program <- readFile file
+  case parse programParser "" program of
+    Left e -> print e >> fail "parse error"
+    Right r -> return r

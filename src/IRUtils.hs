@@ -18,16 +18,20 @@ subst idx sub_e (LocalVar s idx') =
 subst _ _ (Builtin b) = Builtin b
 subst _ _ (Def s) = Def s
 subst _ _ (Const c) = Const c
-subst idx sub_e (Assign s e1 e2) = Assign s (subst idx sub_e e1) (subst (idx + 1) sub_e e2)
-subst idx sub_e (IfThenElse e1 e2 e3) = IfThenElse (subst idx sub_e e1) (subst idx sub_e e2) (subst idx sub_e e3)
+subst idx sub_e (Assign s e1 e2) =
+  Assign s (subst idx sub_e e1) (subst (idx + 1) sub_e e2)
+subst idx sub_e (IfThenElse e1 e2 e3) =
+  IfThenElse (subst idx sub_e e1) (subst idx sub_e e2) (subst idx sub_e e3)
 subst idx sub_e (Call e1 e2) = Call (subst idx sub_e e1) (subst idx sub_e e2)
-subst idx sub_e (Lambda s (LinearArg e1) e2) = Lambda s (LinearArg $ subst idx sub_e e1) (subst (idx + 1) sub_e e2)
-subst idx sub_e (Lambda s (UnrestrictedArg e1) e2) = Lambda s (UnrestrictedArg $ subst idx sub_e e1) (subst (idx + 1) sub_e e2)
+subst idx sub_e (Lambda s (LinearArg e1) e2) =
+  Lambda s (LinearArg $ subst idx sub_e e1) (subst (idx + 1) sub_e e2)
+subst idx sub_e (Lambda s (UnrestrictedArg e1) e2) =
+  Lambda s (UnrestrictedArg $ subst idx sub_e e1) (subst (idx + 1) sub_e e2)
 subst _ _ Type = Type
 
 -- Get an expression from a definition
 getExprFromDef :: Definition -> Expr
-getExprFromDef (Definition name ((arg_name, arg) : args) typ body) =
+getExprFromDef (Definition name ((arg_name, arg):args) typ body) =
   Lambda arg_name arg $ getExprFromDef (Definition name args typ body)
 getExprFromDef (Definition _ [] _ body) = body
 
@@ -44,10 +48,10 @@ callByValue _ (LocalVar s idx) = LocalVar s idx
 -- Keep the definition in case it has arguments (because it is a value),
 -- ortherwise unfolds it
 callByValue p (Def s) =
-  let def = getDefinition s p in
-    if def_args def == [] then
-      callByValue p (getExprFromDef def)
-    else Def s
+  let def = getDefinition s p
+   in if def_args def == []
+        then callByValue p (getExprFromDef def)
+        else Def s
 callByValue _ (Const c) = Const c
 callByValue p (Assign _ e1 e2) = callByValue p $ subst 0 (callByValue p e1) e2
 callByValue p (IfThenElse cond e1 e2) =

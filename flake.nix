@@ -20,7 +20,7 @@
         packages = hpkgs: [ hpkgs.untitled-language ];
         withHoogle = false;
         buildInputs = with compiler-set; [
-          cabal-install hlint
+          cabal-install hlint hindent
         ];
       };
     in {
