@@ -1,4 +1,3 @@
-import BoolTest
 import Parser
 import ParsingToIR
 import Typing
@@ -12,4 +11,4 @@ main = do
   parsed_ir <- Parser.parseFile "examples/test.ulm"
   case checkAndType parsed_ir of
     Left err -> putStrLn $ "Error: " ++ show err
-    Right res -> runBooleanProgram res
+    Right res -> putStrLn $ show res
