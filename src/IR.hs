@@ -11,7 +11,7 @@ data ConstType
   | BoolConst Bool
   | BoolType
   | IntType
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 data DebugInfo a =
   DI a
@@ -22,13 +22,16 @@ instance Eq (DebugInfo a) where
 instance Show a => Show (DebugInfo a) where
   show (DI x) = show x
 
+instance Ord (DebugInfo a) where
+  _ <= _ = True
+
 data Builtins
   = Product
   | Plus
   | Ampersand
   | LinearArrow
   | UnrestrictedArrow
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
 
 data Expr
   = LocalVar (DebugInfo String) Int
@@ -40,11 +43,12 @@ data Expr
   | Call Expr Expr
   | Lambda (DebugInfo String) Arg Expr
   | Type
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
 
 data Type
   = Int
   | Bool
+  | Universe
   | Prod Type Type
   | Choice Type Type
   | Sum Type Type
@@ -55,7 +59,7 @@ data Type
 data Arg
   = UnrestrictedArg Expr
   | LinearArg Expr
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
 
 data Definition =
   Definition
@@ -64,13 +68,13 @@ data Definition =
     , def_type :: Expr
     , def_body :: Expr
     }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
 
 data Program =
   Program
     { _prog_defs :: Map String Definition
     }
-  deriving (Show)
+  deriving (Show, Eq, Ord)
 
 makeLenses ''Program
 
