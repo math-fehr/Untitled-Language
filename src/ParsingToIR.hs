@@ -31,7 +31,7 @@ emptyCtx = PIRContext [] S.empty
 builtinsOp :: Map String Builtins
 builtinsOp = M.fromList
   [ ("*",  IR.Product)
-  , ("+",  IR.Sum)
+  , ("+",  IR.Plus)
   , ("&",  IR.Ampersand)
   , ("->", IR.UnrestrictedArrow)
   , ("-o", IR.LinearArrow)

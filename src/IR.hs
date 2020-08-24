@@ -23,7 +23,7 @@ instance Show a => Show (DebugInfo a) where
   show (DI x) = show x
 
 data Builtins = Product
-              | Sum
+              | Plus
               | Ampersand
               | LinearArrow
               | UnrestrictedArrow
@@ -40,6 +40,16 @@ data Expr
   | Lambda (DebugInfo String) Arg Expr
   | Type
   deriving (Eq,Show)
+
+data Type
+  = Int
+  | Bool
+  | Prod     Type Type
+  | Choice   Type Type
+  | Sum      Type Type
+  | LinArrow Type Type
+  | UnrArrow Type Type
+  deriving (Eq,Show,Ord)
 
 data Arg = UnrestrictedArg Expr
          | LinearArg       Expr
