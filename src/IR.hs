@@ -109,9 +109,11 @@ data ExprT typ expr
 
 newtype Expr =
   Expr (ExprT Expr Expr)
+  deriving (Eq, Show)
 
 data TExpr =
   TExpr Type (ExprT Type Expr)
+  deriving (Eq, Show)
 
 data DefT typ expr =
   DefT
