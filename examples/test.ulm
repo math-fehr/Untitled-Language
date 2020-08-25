@@ -2,6 +2,28 @@
 def not : (a: bool) -o bool :=
     if a then false else true
 
+decl not : T -> array T 3 def not a := ...
+
+
+pattern -> expr
+
+expr : expr -> expr
+
+forall (var : expr) -> expr
+
+
+
+let g : f a b c -> expr
+
+let first : forall (t : Type) -> Vector t -> t
+
+@ Int -> Int
+
+match ... with
+| Vector t => ...
+
+let triple : x: {T : Type}-> array T 3
+
 def and : (a: bool) -o (b: bool) -> bool :=
     if a then b else false
 
@@ -24,3 +46,103 @@ def aborc : (a: bool) -> (b: bool) -> (c: bool) -> bool :=
 def alwaystrue : (a: bool) -> bool :=
     (aborc (id a) (not (applytwice id a))) (not (not a))
 
+/* type : leaf or sum of prod and nothing else
+   sum & prod : Each field may have a debug name.
+
+   sum types:
+   construction: Each constructor exposes a function
+
+*/
+
+/*
+  match
+    Abc => Check for Abc in global context if it's a
+           Constructor, do the constructor magic.
+           The context search is also ADL.
+    = Abc => Check if the value IS the constructor Abc.
+*/
+
+typ bool2 = enum
+  | true2
+  | false2
+
+newtype typename expr
+
+typename = newname + 0 or more expressions
+
+x : T -> f T
+
+typ name arg = ... <=> def name arg = newtype (name arg) ...
+
+def bool2 = newtype bool2 enum
+  | true2
+  | false2
+
+def true2 = constr unit
+
+def false2 = constr unit
+
+/*
+match
+ | true2 =>
+ | false2 =>
+ | 0
+ | x = 1 + 2 => // match if x is 3
+ | x ? is_odd => // match is id_odd x is true
+ | x =? optfunc -> // match if optfunc returns Some and bind x to the result
+ */
+
+/*
+
+TODO
+
+pub decl : classique
+
+pub def : type of child modules can depends on this function result:
+          It's implementation is part of the interface.
+
+import def : also import definition : able to use any function as constexpr.
+
+*/
+
+/* declaration
+
+typ = def + decl with newtype
+
+constr = def + decl of constructor.
+
+enum = sum + implicit constructor decl.
+
+field = def + decl of field.
+
+struct = proc + implicit field decl.
+
+*/
+
+/* Types:
+
+   Leaf types:
+   bool
+   byte != u8
+   int -> C int (i32 for now)
+   integer -> bigint
+   i32 -> no wrap signed
+   u32 -> no wrap unsinged
+   s32 -> wrap signed
+   w32 -> wrap unsinged
+
+   `,`, `^`, `&`, `|` are many operators
+
+   tuple = `^`
+
+   enum { A of int }
+
+   struct {a : int ; b : float }
+
+   enum x := {A of t | B of float}
+
+   struct x := {a : int; b : float} <=> decl x : type def x := newtype x (struct { ... })
+
+   [ a; b ; c ; d ] -> array of size 4
+   a :: b :: c :: Nil
+*/
