@@ -27,29 +27,7 @@ main = do
 main_tests :: IO TestTree
 main_tests = do
   ran_tests <- run_tests
-  return $ testGroup "Tests" [parser_tests, ran_tests]
-
-parser_tests :: TestTree
-parser_tests = testGroup "Parser" [parser_expr_tests]
-
-parser_expr_examples :: [(Parser.Expr, String)]
-parser_expr_examples =
-  [ (Parser.IntConst 5, "5")
-  , (Parser.BoolConst True, "true")
-  , (Parser.BoolConst False, "false")
-  ]
-
-parser_make_test :: (Show a, Eq a) => Parser a -> (a, String) -> TestTree
-parser_make_test parser (expected, src) =
-  testCase ("Parsing \"" ++ show expected ++ "\"") $
-  case parse parser "test" src of
-    Right result -> result @?= expected
-    Left err -> assertFailure $ "Failed to parse :" ++ show err
-
-parser_expr_tests :: TestTree
-parser_expr_tests =
-  testGroup "Expr" $
-  fmap (parser_make_test Parser.exprParser) parser_expr_examples
+  return $ testGroup "Tests" [ran_tests]
 
 -- Check a program
 checkAndType :: Parser.Program -> Either Error IR.Program
