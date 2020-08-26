@@ -27,12 +27,35 @@ tests = do
 
 -- | A list of examples
 parser_expr_examples :: [(Parser.Expr, String)]
-parser_expr_examples = [(Parser.IntConst 5, "5"), (Parser.IntConst 42, "42")]
+parser_expr_examples =
+  [ (IntConst 5, "5")
+  , (IntConst 42, "42")
+  , ( BinOp
+        BUnrestrictedArrow
+        (Var "a")
+        (BinOp BUnrestrictedArrow (Var "b") (Var "c"))
+    , "a -> b -> c")
+  , ( BinOp
+        BLinearArrow
+        (Var "a")
+        (BinOp BUnrestrictedArrow (Var "b") (Var "c"))
+    , "a -@ b -> c")
+  , ( BinOp
+        BUnrestrictedArrow
+        (Var "a")
+        (BinOp BLinearArrow (Var "b") (Var "c"))
+    , "a -> b -@ c")
+  , (ManyOp MBar [(Var "a"), (Var "b"), (Var "c")], "a | b | c")
+  , ( ManyOp MBar [Parens $ ManyOp MBar [(Var "a"), (Var "b")], (Var "c")]
+    , "(a | b) | c")
+  , ( ManyOp MBar [(Var "a"), Parens $ ManyOp MBar [(Var "b"), (Var "c")]]
+    , "a | (b | c)")
+  ]
 
 -- | Parse an element and check the equality against an expected element
 parser_make_test :: (Show a, Eq a) => Parser a -> (a, String) -> TestTree
 parser_make_test parser (expected, src) =
-  testCase ("Parsing \"" ++ show expected ++ "\"") $
+  testCase ("Parsing \"" ++ src ++ "\"") $
   case parse parser "test" src of
     Right result -> result @?= expected
     Left err -> assertFailure $ "Failed to parse :" ++ show err
