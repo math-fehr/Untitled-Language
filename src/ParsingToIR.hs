@@ -114,11 +114,10 @@ defToIr (PDefinition name args body typ) ctx = do
 
 -- Parse a parsed program to an IR program
 parsedProgramToIr :: Parser.Program -> Either Error IR.Program
-parsedProgramToIr p = do
+parsedProgramToIr =
   foldM
     (\p' decl ->
        case decl of
          DefDecl def -> flip insertDefinition p' <$> defToIr def emptyCtx
-         IndDecl _ -> return $ p')
-    (IR.ProgramT M.empty)
-    p
+         IndDecl _ -> return p')
+    (IR.Program M.empty)

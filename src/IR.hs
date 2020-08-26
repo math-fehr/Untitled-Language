@@ -89,8 +89,10 @@ data Value
   | VStruct [(String, Value)]
   | VTuple [Value]
   | VConstr String Value
-  | VFun TExpr
-  -- ^ The function is evaluated by binding the Bruijn index 0 and evaluating
+  | VFun [Value] TExpr
+  -- ^ The argument is at De Bruijn index 0 and the context in the list is above 0
+  | VForall [TValue] Type Expr
+  -- ^ Function whose body type depends on the argument.
   | VOperator Operator
   deriving (Show, Eq, Ord)
 
@@ -171,23 +173,21 @@ type Decl = DeclT Expr Expr
 
 type TDecl = DeclT Type TExpr
 
-newtype ProgramT typ expr =
-  ProgramT
-    { prog_defs :: Map String (DeclT typ expr)
+newtype Program =
+  Program
+    { prog_defs :: Map String (DeclT Expr Expr)
     }
   deriving (Show, Eq, Ord)
 
-type Program = ProgramT Expr Expr
+type TProgram = Map String TValue
 
-type TProgram = ProgramT Type Expr
-
-insertDefinition :: DefT typ expr -> ProgramT typ expr -> ProgramT typ expr
+insertDefinition :: Def -> Program -> Program
 insertDefinition def prog =
-  ProgramT {prog_defs = M.insert (def_name def) (DDef def) (prog_defs prog)}
+  Program {prog_defs = M.insert (def_name def) (DDef def) (prog_defs prog)}
 
-insertDeclaration :: DeclT typ expr -> ProgramT typ expr -> ProgramT typ expr
+insertDeclaration :: Decl -> Program -> Program
 insertDeclaration decl prog =
-  ProgramT {prog_defs = M.insert (declName decl) decl (prog_defs prog)}
+  Program {prog_defs = M.insert (declName decl) decl (prog_defs prog)}
 
-getDeclaration :: String -> ProgramT typ expr -> DeclT typ expr
+getDeclaration :: String -> Program -> Decl
 getDeclaration ident p = prog_defs p M.! ident
