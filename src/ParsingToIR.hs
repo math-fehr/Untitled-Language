@@ -122,9 +122,20 @@ indToIr (PInductive name constrs) ctx = do
       constrs
   return $ DEnum name constrs'
 
+structToIr :: PStruct -> PIRContext -> Either Error Decl
+structToIr (PStruct name fields) ctx = do
+  fields' <-
+    mapM
+      (\(f_name, typ) -> do
+         typ' <- exprToIr typ ctx
+         return (f_name, typ'))
+      fields
+  return $ DStruct name fields'
+
 declToIr :: PDeclaration -> PIRContext -> Either Error Decl
 declToIr (DefDecl d) ctx = defToIr d ctx
 declToIr (IndDecl d) ctx = indToIr d ctx
+declToIr (StructDecl s) ctx = structToIr s ctx
 
 -- Parse a parsed program to an IR program
 parsedProgramToIr :: Parser.Program -> Either Error IR.Program

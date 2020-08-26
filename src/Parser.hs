@@ -84,9 +84,16 @@ data PInductive =
     }
   deriving (Show, Eq)
 
+data PStruct =
+  PStruct
+    { ps_name :: String
+    , ps_fields :: [(String, Expr)]
+    }
+
 data PDeclaration
   = DefDecl PDefinition
   | IndDecl PInductive
+  | StructDecl PStruct
 
 type Program = [PDeclaration]
 
@@ -112,6 +119,7 @@ languageDef =
         , "enum"
         , "forall"
         , "of"
+        , "struct"
         ]
     , Token.reservedOpNames =
         [ "+"
@@ -130,6 +138,7 @@ languageDef =
         , ","
         , "{"
         , "}"
+        , ";"
         ]
     }
 
@@ -308,9 +317,20 @@ inductiveParser = do
   reservedOp "}"
   return $ PInductive name cases
 
+structParser :: Parser PStruct
+structParser = do
+  reserved "struct"
+  name <- identifier
+  reservedOp ":="
+  reservedOp "{"
+  fields <- sepBy typedVarParser (reservedOp ";")
+  reservedOp "}"
+  return $ PStruct name fields
+
 declarationParser :: Parser PDeclaration
 declarationParser =
-  (DefDecl <$> definitionParser) <|> (IndDecl <$> inductiveParser)
+  (DefDecl <$> definitionParser) <|> (IndDecl <$> inductiveParser) <|>
+  (StructDecl <$> structParser)
 
 -- Main parser
 programParser :: Parser Program
