@@ -18,7 +18,7 @@ data BinOp
   | BDiv
   | BUnrestrictedArrow
   | BLinearArrow
-  deriving (Show, Eq)
+  deriving (Ord, Show, Eq)
 
 str2binOp :: String -> BinOp
 str2binOp "+" = BPlus
@@ -33,7 +33,7 @@ data ManyOp
   | MBar
   | MHat
   | MComma
-  deriving (Show, Eq)
+  deriving (Ord, Show, Eq)
 
 str2manyOp :: String -> ManyOp
 str2manyOp "&" = MAmpersand

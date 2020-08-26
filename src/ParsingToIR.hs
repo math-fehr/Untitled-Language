@@ -47,9 +47,10 @@ manyOpBuiltins =
 
 -- Get an expression from an identifier
 getExprFromIdent :: String -> PIRContext -> Maybe IR.Expr
-getExprFromIdent str (PIRContext local def)
-  | str `elem` local = LocalVar (DI str) <$> elemIndex str local
-  | otherwise = Just $ Def str
+getExprFromIdent str (PIRContext local)
+  | str `elem` local =
+    Expr SourcePos <$> LocalVar (DI str) <$> elemIndex str local
+  | otherwise = Just $ Expr SourcePos $ Def str
 
 -- Add a local variable with de bruijn index 0 to the context
 addLocalVar :: String -> PIRContext -> PIRContext
