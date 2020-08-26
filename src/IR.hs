@@ -27,6 +27,11 @@ data IntType =
     }
   deriving (Eq, Show, Ord)
 
+data Variable
+  = DeBruijn Int
+  | Global String
+  deriving (Eq, Ord, Show)
+
 -- | The *concrete* values for types.
 data TypeBase
   = TVar (DebugInfo String) Int
@@ -49,10 +54,11 @@ data TypeBase
   --   The arguments must have an equality. For now only bool, int and type are supported
   deriving (Show, Eq, Ord)
 
-data Type = Type
-  { comptime :: Bool
-  , base :: TypeBase
-  }
+data Type =
+  Type
+    { comptime :: Bool
+    , base :: TypeBase
+    }
   deriving (Show, Eq, Ord)
 
 void :: Type
@@ -76,7 +82,7 @@ data Operator
 -- | Type for concrete comptime values in the interpreter
 data Value
   = VUnit
-  | VInt Int
+  | VInt Integer
     -- ^ Can be of any integer size and a byte
   | VBool Bool
   | VType Type
@@ -97,8 +103,13 @@ data ExprT typ expr
   = LocalVar (DebugInfo String) Int
   | Def String
   -- ^ Unresolved Definition.
-  | IntConst Int
-  | Let (DebugInfo String) (Maybe typ) expr
+  | Value Value
+  | Let
+      { name :: DebugInfo String
+      , val :: expr
+      , vartyp :: (Maybe typ)
+      , body :: expr
+      }
   | IfThenElse expr expr expr
   | Call expr expr
     -- ^ Many Op are called on a big tuple
@@ -114,7 +125,8 @@ data ExprT typ expr
     -- ^ ForAll (name of var) (type of var) (type of the rest of the arrow)
   deriving (Eq, Show, Ord)
 
-data SourcePos = SourcePos
+data SourcePos =
+  SourcePos
   deriving (Eq, Show, Ord)
 
 data Expr =

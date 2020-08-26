@@ -34,11 +34,6 @@ import IR
 --   / _ \| '_ (_-<  _| '_/ _` / _|  _|
 --  /_/ \_\_.__/__/\__|_| \__,_\__|\__|
 --  
-data Variable
-  = DeBrujin Int
-  | Global String
-  deriving (Eq, Ord, Show)
-
 data VarStatus
   = Unrestricted
   | LinearUsed
