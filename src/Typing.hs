@@ -21,6 +21,7 @@ import Data.Vector (Vector)
 import qualified Data.Vector as V
 import Error
 import IR
+import Interpreter
 
 --   _____            _               __  __                       _ 
 --  |_   _|   _ _ __ (_)_ __   __ _  |  \/  | ___  _ __   __ _  __| |
@@ -51,9 +52,10 @@ data TypingError
   | NotAType Expr -- Expression is not a type
   | UnknownVariable Variable
   | LastScope
-  | UnknownBuiltin Builtins
+  -- UnknownBuiltin Builtins
   | DifferringRessources Expr Expr
   | LinearUseIllegal String Expr
+  | RuntimeError RuntimeError
   deriving (Eq, Show)
 
 -- Abstract Typing Monad definition
@@ -63,6 +65,8 @@ class MonadError TypingError m =>
   addGlobal :: String -> Type -> m ()
   addLinear :: String -> Type -> m ()
   addUnrestricted :: String -> Type -> m ()
+  setValue :: Variable -> Value -> m ()
+  getValue :: Variable -> m (Maybe Value)
   leaveScope :: m String -- Name of variable which scope we're leaving
   variableStatus :: Variable -> m VarStatus
   -- State manipulation
@@ -74,6 +78,7 @@ class MonadError TypingError m =>
   varType :: Variable -> m Type
   freeVariables :: m (Set Variable)
   runTyping :: m a -> Either TypingError a
+  interpret :: TExpr -> m TValue
 
 -- Concrete typing monad
 --    ___                     _       

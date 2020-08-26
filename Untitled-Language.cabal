@@ -19,7 +19,7 @@ extra-source-files:  CHANGELOG.md
 
 executable Untitled-Language
   main-is:             Main.hs
-  other-modules:       Parser, IR, IRUtils, ParsingToIR, Error, Typing, Utils
+  other-modules:       Parser, IR, IRUtils, ParsingToIR, Error, Typing, Utils, Interpreter
   -- other-extensions:
   build-depends:       base >= 4.11 && < 5.0
                      , parsec >= 3.1 && < 4.0
@@ -40,7 +40,7 @@ executable Untitled-Language
 
 test-suite Tasty
   main-is:             Tests.hs
-  other-modules:       Parser, IR, IRUtils, ParsingToIR, Error, Typing, Utils
+  other-modules:       Parser, IR, IRUtils, ParsingToIR, Error, Typing, Utils, Interpreter
   type:                exitcode-stdio-1.0
   build-depends:       base >= 4.11 && < 5.0
                      , parsec >= 3.1 && < 4.0
