@@ -166,7 +166,8 @@ varParser = Var <$> identifier
 -- | Parse expressions with precedence 4
 expr4Parser :: Parser Expr
 expr4Parser =
-  parens exprParser <|> varParser <|> IntConst . fromInteger <$> integer
+  Parens <$> parens exprParser <|> varParser <|>
+  IntConst . fromInteger <$> integer
 
 -- | Parse expressions with precedence 3
 expr3Parser :: Parser Expr
