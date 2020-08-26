@@ -16,3 +16,7 @@ duplicate (x:l) =
   if elem x l
     then Just x
     else duplicate l
+
+percolateMaybe :: Monad m => Maybe (m a) -> m (Maybe a)
+percolateMaybe Nothing = return Nothing
+percolateMaybe (Just x) = x >>= return . Just
