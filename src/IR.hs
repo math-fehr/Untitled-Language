@@ -28,7 +28,7 @@ data IntType =
   deriving (Eq, Show, Ord)
 
 -- | The *concrete* values for types.
-data Type
+data TypeBase
   = TVar (DebugInfo String) Int
   -- ^ Type variable bounded by a Forall (de Bruijn)
   | TBool
@@ -50,11 +50,17 @@ data Type
   --   The arguments must have an equality. For now only bool, int and type are supported
   deriving (Show, Eq, Ord)
 
+data Type = Type
+  { comptime :: Bool
+  , base :: TypeBase
+  }
+  deriving (Show, Eq, Ord)
+
 void :: Type
-void = TSum []
+void = Type {comptime = True, base = TSum []}
 
 unit :: Type
-unit = TTuple []
+unit = Type {comptime = True, base = TTuple []}
 
 data Operator
   = Plus
@@ -78,7 +84,8 @@ data Value
   | VStruct [(String, Value)]
   | VTuple [Value]
   | VConstr String Value
-  -- VFun (Value -> Value)
+  | VFun TExpr
+  -- ^ The function is evaluated by binding the Bruijn index 0 and evaluating
   | VOperator Operator
   deriving (Show, Eq, Ord)
 
@@ -92,10 +99,11 @@ data ExprT typ expr
   | Def String
   -- ^ Unresolved Definition.
   | IntConst Int
-  | Let (DebugInfo String) typ expr
+  | Let (DebugInfo String) (Maybe typ) expr
   | IfThenElse expr expr expr
   | Call expr expr
     -- ^ Many Op are called on a big tuple
+  | Operator Operator
   | Tuple [expr]
   | Lambda
       { name :: DebugInfo String
