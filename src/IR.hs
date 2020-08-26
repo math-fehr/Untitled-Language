@@ -36,7 +36,6 @@ data TypeBase
   -- ^ The type of a type
   | TInt IntType
   | TByte
-  | TUniverse
   | TTuple [Type]
   | TArray Type Int
   | TChoice [Type]
