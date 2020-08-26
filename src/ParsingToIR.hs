@@ -104,20 +104,31 @@ exprToIr (Parser.Lambda name arg body) ctx = do
 exprToIr (Parser.Parens e) ctx = exprToIr e ctx
 
 -- Transform a parsed function to an IR function
-defToIr :: PDefinition -> PIRContext -> Either Error Def
+defToIr :: PDefinition -> PIRContext -> Either Error Decl
 defToIr (PDefinition name args body typ) ctx = do
   let args' = DI <$> args
   typ' <- exprToIr typ ctx
   let ctx' = foldl (flip addLocalVar) ctx args
   body' <- exprToIr body ctx
-  return $ DefT name typ' args' body'
+  return $ DDef $ DefT name typ' args' body'
+
+indToIr :: PInductive -> PIRContext -> Either Error Decl
+indToIr (PInductive name constrs) ctx = do
+  constrs' <-
+    mapM
+      (\(PIndConstructor c_name typ) -> do
+         typ' <- exprToIr typ ctx
+         return (c_name, typ'))
+      constrs
+  return $ DEnum name constrs'
+
+declToIr :: PDeclaration -> PIRContext -> Either Error Decl
+declToIr (DefDecl d) ctx = defToIr d ctx
+declToIr (IndDecl d) ctx = indToIr d ctx
 
 -- Parse a parsed program to an IR program
 parsedProgramToIr :: Parser.Program -> Either Error IR.Program
 parsedProgramToIr =
   foldM
-    (\p' decl ->
-       case decl of
-         DefDecl def -> flip insertDefinition p' <$> defToIr def emptyCtx
-         IndDecl _ -> return p')
+    (\p' decl -> flip insertDeclaration p' <$> declToIr decl emptyCtx)
     (IR.Program M.empty)

@@ -84,11 +84,11 @@ data PInductive =
     }
   deriving (Show, Eq)
 
-data Declaration
+data PDeclaration
   = DefDecl PDefinition
   | IndDecl PInductive
 
-type Program = [Declaration]
+type Program = [PDeclaration]
 
 -- * Lexer
 languageDef =
@@ -308,7 +308,7 @@ inductiveParser = do
   reservedOp "}"
   return $ PInductive name cases
 
-declarationParser :: Parser Declaration
+declarationParser :: Parser PDeclaration
 declarationParser =
   (DefDecl <$> definitionParser) <|> (IndDecl <$> inductiveParser)
 
