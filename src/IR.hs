@@ -107,13 +107,16 @@ data ExprT typ expr
     -- ^ ForAll (name of var) (type of var) (type of the rest of the arrow)
   deriving (Eq, Show, Ord)
 
-newtype Expr =
-  Expr (ExprT Expr Expr)
-  deriving (Eq, Show)
+data SourcePos = SourcePos
+  deriving (Eq, Show, Ord)
+
+data Expr =
+  Expr SourcePos (ExprT Expr Expr)
+  deriving (Eq, Show, Ord)
 
 data TExpr =
   TExpr Type (ExprT Type Expr)
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
 
 data DefT typ expr =
   DefT
