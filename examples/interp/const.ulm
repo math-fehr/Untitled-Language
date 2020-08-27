@@ -1,0 +1,3 @@
+decl main : int -> int
+def x :=
+   if true then 42 else 1

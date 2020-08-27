@@ -350,16 +350,3 @@ extractCaptured depth (Lambda name linear typ body) =
   Lambda name linear typ <$> extractCapturedT (depth + 1) body
 extractCaptured depth (ForAll name typ body) =
   ForAll name typ <$> extractCapturedT (depth + 1) body
-
-interpret :: TExpr -> Either RuntimeError Value
-interpret expr = rinter $ interpretTExpr expr
-  where
-    rinter :: ConcreteInterpreterMonad a -> Either RuntimeError a
-    rinter = runInterpreter (GlobalContext M.empty M.empty)
--- >>> interpret (TExpr undefined (Call (TExpr undefined (Call (TExpr undefined (Operator Minus)) (TExpr undefined (Value $ VInt 2)))) (TExpr undefined (Value $ VInt 3))))
--- Right (VInt (-1))
--- >>> interpret (TExpr undefined (Let (DI "x") (TExpr undefined (Value $ VInt 2)) undefined (TExpr undefined (Call (TExpr undefined (Call (TExpr undefined (Operator Minus)) (TExpr undefined (LocalVar (DI "x") 0)))) (TExpr undefined (Value $ VInt 3))))))
--- Right (VInt (-1))
--- >>> let lambda = TExpr undefined (Lambda (DI "x") True undefined (TExpr undefined (Lambda (DI "y") True undefined (TExpr undefined (Call (TExpr undefined (Call (TExpr undefined (Operator Minus)) (TExpr undefined (LocalVar (DI "y") 0)))) (TExpr undefined (LocalVar (DI "x") 1)))))))
--- >>> interpret $ TExpr undefined (Let (DI "f") lambda Nothing (TExpr undefined (Call (TExpr undefined (Call (TExpr undefined (LocalVar (DI "f") 0)) (TExpr undefined (Value $ VInt 2)))) (TExpr undefined (Value $ VInt 3)))))
--- Right (VInt 1)

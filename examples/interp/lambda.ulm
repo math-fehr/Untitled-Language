@@ -1,0 +1,4 @@
+decl main : int -> int
+def x := let f := fun (a : bool) => a in
+         let g := fun (i : int) => i + i in
+   if f true then g 21 else 1
