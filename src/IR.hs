@@ -105,7 +105,7 @@ data ExprT typ expr
   = LocalVar (DebugInfo String) Int
   | Def String
   -- ^ Unresolved Definition.
-  | Value Value
+  | Value TValue
   | Let
       { name :: DebugInfo String
       , val :: expr

@@ -38,23 +38,22 @@ interpret expr = rinter $ interpretTExpr expr
 deftyp :: Type
 deftyp = Type True TType
 
+mkint :: Integer -> TExpr
+mkint x = TExpr deftyp (Value (TValue (VInt x) deftyp))
+
 ast_tests_data :: [(TExpr, Value)]
 ast_tests_data =
   [ ( TExpr
         deftyp
         (Call
-           (TExpr
-              deftyp
-              (Call
-                 (TExpr deftyp (Operator Minus))
-                 (TExpr deftyp (Value $ VInt 2))))
-           (TExpr deftyp (Value $ VInt 3)))
+           (TExpr deftyp (Call (TExpr deftyp (Operator Minus)) (mkint 2)))
+           (mkint 3))
     , VInt (-1))
   , ( TExpr
         deftyp
         (Let
            (DI "x")
-           (TExpr deftyp (Value $ VInt 2))
+           (mkint 2)
            Nothing
            (TExpr
               deftyp
@@ -64,7 +63,7 @@ ast_tests_data =
                     (Call
                        (TExpr deftyp (Operator Minus))
                        (TExpr deftyp (LocalVar (DI "x") 0))))
-                 (TExpr deftyp (Value $ VInt 3)))))
+                 (mkint 3))))
     , VInt (-1))
   , ( let lambda =
             TExpr
@@ -99,10 +98,8 @@ ast_tests_data =
                   (Call
                      (TExpr
                         deftyp
-                        (Call
-                           (TExpr deftyp (LocalVar (DI "f") 0))
-                           (TExpr deftyp (Value $ VInt 2))))
-                     (TExpr deftyp (Value $ VInt 3)))))
+                        (Call (TExpr deftyp (LocalVar (DI "f") 0)) (mkint 2)))
+                     (mkint 3))))
     , VInt 1)
   ]
 
@@ -154,9 +151,7 @@ mockTypeFile prog =
 
 file_expression :: TExpr
 file_expression =
-  TExpr
-    undefined
-    (Call (TExpr undefined (Def "main")) (TExpr undefined (Value $ VInt 0)))
+  TExpr undefined (Call (TExpr undefined (Def "main")) (mkint 0))
 
 file_make_test :: FilePath -> Value -> IO TestTree
 file_make_test path expected = do

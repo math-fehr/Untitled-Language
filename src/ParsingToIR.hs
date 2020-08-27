@@ -63,7 +63,10 @@ exprToIr (Var str) ctx =
   case getExprFromIdent str ctx of
     Just res -> return res
     Nothing -> Left $ UndefinedReference str
-exprToIr (Parser.IntConst i) _ = return $ Expr SourcePos $ Value $ VInt i
+exprToIr (Parser.IntConst i) _ =
+  return $
+  Expr SourcePos $
+  Value $ TValue (VInt i) $ Type True $ TInt $ IntType 32 True False
 exprToIr (Parser.Let var typ val body) ctx = do
   typ' <- percolateMaybe $ flip exprToIr ctx <$> typ
   val' <- exprToIr val ctx

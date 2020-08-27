@@ -21,7 +21,7 @@ import Data.Vector (Vector)
 import qualified Data.Vector as V
 import Error
 import IR
-import Interpreter
+import Interpreter hiding (UndefinedVariable)
 
 --   _____            _               __  __                       _
 --  |_   _|   _ _ __ (_)_ __   __ _  |  \/  | ___  _ __   __ _  __| |
@@ -68,6 +68,7 @@ data TypingError
   | RuntimeError RuntimeError -- The typer required an evaluation which failed.
   | TypingCycle -- There is an unsolvable cyclic dependency for typing TODO: Print the cycle
   | InternalError String
+  | NotAnArrow TypeBase -- The type is not an arrow
   deriving (Eq, Show)
 
 -- Abstract Typing Monad definition
@@ -205,7 +206,12 @@ instance TypingMonad ConcreteTypingMonad
   variableStatus = undefined
   saveState = undefined
   hideLinear = undefined
-  useVar = undefined
+  useVar (DeBruijn id) = do
+    var <-
+      preuse (ts_local . ix id) >>=
+      maybe (throwError $ UnknownVariable $ DeBruijn id) return
+    let usedVar = var & lv_isUsed .~ True
+    ts_local . ix id .= usedVar
   varName = undefined
   varType = undefined
   freeVariables = undefined
@@ -311,8 +317,115 @@ declDecl = undefined
 defDecl :: TypingMonad m => String -> m TValue
 defDecl = undefined
 
+typeVariable :: TypingMonad m => String -> Expr -> Variable -> m Type
+typeVariable name e var = do
+  state <- variableStatus var
+  case state of
+    LinearUsed -> throwError $ ReusedLinear name e
+    LinearHidden -> throwError $ LinearUseIllegal name e
+    Undefined -> throwError $ Typing.UndefinedVariable name e
+    _ -> useVar var >> varType var
+
 typeExpr :: TypingMonad m => Expr -> m TExpr
-typeExpr = undefined
+typeExpr e = do
+  te@(TExpr (Type comptime typ) e') <- typeExpr' e
+  if comptime
+    then do
+      v <- Typing.interpret te
+      return $ TExpr (Type True typ) (Value v)
+    else return te
+
+typeExpr' :: TypingMonad m => Expr -> m (TExpr)
+typeExpr' e@(Expr _ (LocalVar (DI name) id)) =
+  TExpr <$> (typeVariable name e $ DeBruijn id) <*>
+  (return $ LocalVar (DI name) id)
+typeExpr' e@(Expr _ (Def def)) =
+  TExpr <$> (typeVariable def e $ Global def) <*> (return (Def def))
+typeExpr' (Expr _ (Value (TValue val typ))) =
+  return $ TExpr typ (Value (TValue val typ))
+typeExpr' (Expr _ (Let (DI name) val valtyp body)) = do
+  teval@(TExpr tval _) <- typeExpr val
+  addLinear name tval Nothing
+  tebody@(TExpr tbody _) <- typeExpr body
+  _ <- leaveScope
+  case valtyp of
+    Just valtyp -> do
+      tvaltyp <- typeExprToType valtyp
+      when (tvaltyp /= tval) $ throwError $ ExpectedType val tvaltyp tval
+      return $ TExpr tbody $ Let (DI name) teval (Just tval) tebody
+    _ -> return $ TExpr tbody $ Let (DI name) teval (Just tval) tebody
+typeExpr' (Expr _ (IfThenElse cond thenE elseE)) = do
+  tecond@(TExpr ctyp _) <- typeExpr cond
+  when (ctyp /= (Type False TBool)) $ throwError $
+    ExpectedType cond ctyp (Type False TBool)
+  (tethen@(TExpr thenT _), thenV) <-
+    saveState $ (,) <$> typeExpr thenE <*> freeVariables
+  (teelse@(TExpr elseT _), elseV) <-
+    saveState $ (,) <$> typeExpr elseE <*> freeVariables
+  when (thenV /= elseV) $ throwError $ DifferringRessources thenE elseE
+  when (thenT /= elseT) $ throwError $ ExpectedType elseE thenT elseT
+  return $ TExpr thenT $ IfThenElse tecond tethen teelse
+typeExpr' (Expr _ (Call funE argE)) = do
+  tefun@(TExpr (Type _ tfun) _) <- typeExpr funE
+  case tfun of
+    TLinArrow expectedArgT bodyT -> do
+      tearg@(TExpr targ _) <- typeExpr argE
+      when (targ /= expectedArgT) $ throwError $
+        ExpectedType argE expectedArgT targ
+      return $ TExpr bodyT $ Call tefun tearg
+    TUnrArrow expectedArgT bodyT -> do
+      tearg@(TExpr targ _) <- hideLinear $ typeExpr argE
+      when (targ /= expectedArgT) $ throwError $
+        ExpectedType argE expectedArgT targ
+      return $ TExpr bodyT $ Call tefun tearg
+    _ -> throwError $ NotAnArrow tfun
+typeExpr' (Expr _ (Tuple es)) = do
+  tees <- mapM typeExpr es
+  let comptime = all (\(TExpr (Type b _) _) -> b) tees
+  let typs = (\(TExpr typ _) -> typ) <$> tees
+  return $ TExpr (Type comptime $ TTuple typs) $ (Tuple tees)
+typeExpr' (Expr _ (Lambda (DI name) linear typ body)) = do
+  typ <- typeExprToType typ
+  (if linear
+     then addLinear
+     else addUnrestricted)
+    name
+    typ
+    Nothing
+  tebody@(TExpr tbody _) <- typeExpr body
+  _ <- leaveScope
+  return $
+    TExpr
+      (Type
+         True
+         ((if linear
+             then TLinArrow
+             else TUnrArrow)
+            typ
+            tbody)) $
+    Lambda (DI name) linear typ tebody
+typeExpr' (Expr _ (ForAll (DI name) typ expr)) = do
+  typ' <- typeExprToType typ
+  addUnrestricted name typ' Nothing
+  expr' <- typeExprToType expr
+  _ <- leaveScope
+  return $ TExpr (Type True TType) $ Value $
+    TValue (VType $ Type True $ TForallArrow (DI name) typ' expr') $
+    Type True TType
+typeExpr' (Expr _ (Operator _)) =
+  throwError (InternalError "typing of operators unimplemented")
+
+typeExprToType :: TypingMonad m => Expr -> m (Type)
+typeExprToType e = do
+  te@(TExpr (Type _ etyp) _) <- typeExpr e
+  when (etyp /= TType) $ throwError $ NotAType e
+  (TValue val _) <- Typing.interpret te
+  case val of
+    (VType val) -> return val
+    _ ->
+      throwError $
+      InternalError
+        "interpreter didn't returned a type when given an expression of type Type"
 -- checkProgramWellTyped :: Program -> Either TypingError ()
 -- checkProgramWellTyped program =
 --   runT $ do

@@ -179,7 +179,7 @@ interpretExpr (Lambda name _ _ body) = do
   return $ VFun captured 1 nbody
 interpretExpr (ForAll _ _ _) =
   throwError $ Unimplemented "Forall interpretation"
-interpretExpr (Value v) = return v
+interpretExpr (Value (TValue v t)) = return v
 interpretExpr (Call fun arg) = do
   argV <- interpretTExpr arg
   funV <- interpretTExpr fun
