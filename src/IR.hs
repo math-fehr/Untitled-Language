@@ -89,11 +89,11 @@ data Value
   | VStruct [(String, Value)]
   | VTuple [Value]
   | VConstr String Value
-  | VFun [Value] TExpr
-  -- ^ The argument is at De Bruijn index 0 and the context in the list is above 0
+  | VFun [Value] Int TExpr
+  -- ^ The argument is at De Bruijn index 0 and the context in the list is above 0.
+  --   The integer is the number of expected arguments before reduction is possible
   | VForall [TValue] Type Expr
   -- ^ Function whose body type depends on the argument.
-  | VOperator Operator
   deriving (Show, Eq, Ord)
 
 -- | Typed value
@@ -136,7 +136,7 @@ data Expr =
   deriving (Eq, Show, Ord)
 
 data TExpr =
-  TExpr Type (ExprT Type Expr)
+  TExpr Type (ExprT Type TExpr)
   deriving (Eq, Show, Ord)
 
 data DefT typ expr =

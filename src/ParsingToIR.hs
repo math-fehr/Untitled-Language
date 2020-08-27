@@ -79,9 +79,7 @@ exprToIr (BinOp binop e1 e2) ctx = do
   let op = binOpBuiltins ! binop
   return $
     Expr SourcePos $
-    IR.Call
-      (Expr SourcePos $ IR.Call (Expr SourcePos $ Value (VOperator op)) e1')
-      e2'
+    IR.Call (Expr SourcePos $ IR.Call (Expr SourcePos $ Operator op) e1') e2'
 exprToIr (ManyOp mop es) ctx = do
   let op = manyOpBuiltins ! mop
   es' <- mapM (flip exprToIr ctx) es
