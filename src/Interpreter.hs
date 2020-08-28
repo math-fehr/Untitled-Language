@@ -50,8 +50,8 @@ data RuntimeError
 
 data GlobalContext =
   GlobalContext
-    { globals :: Map String Value
-    , locals :: Map Int Value
+    { globals :: Map String TValue
+    , locals :: Map Int TValue
     }
 
 class MonadError RuntimeError m =>
@@ -119,9 +119,9 @@ instance InterpreterMonad ConcreteInterpreterMonad where
     runExcept $ evalStateT action initState
     where
       initState :: InterpreterState
-      initState = ItState globals stack
+      initState = ItState (fmap extractV globals) stack
       stack :: Vector (Maybe Value)
-      stack = V.generate size (flip M.lookup ids)
+      stack = fmap extractV <$> V.generate size (flip M.lookup ids)
       size :: Int
       size = M.foldrWithKey (\k -> const $ max k) 0 ids
 

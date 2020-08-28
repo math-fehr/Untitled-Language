@@ -256,7 +256,7 @@ makeGlobalContext (TpState globals locals _) =
       -> GlobalStatus
       -> Interpreter.GlobalContext
       -> Interpreter.GlobalContext
-    addGlobal name (Defined (TValue value _)) (Interpreter.GlobalContext globals locals) =
+    addGlobal name (Defined value) (Interpreter.GlobalContext globals locals) =
       Interpreter.GlobalContext (M.insert name value globals) locals
     addGlobal _ _ gc = gc
     addLocal ::
@@ -267,7 +267,7 @@ makeGlobalContext (TpState globals locals _) =
     addLocal id lv gc@(Interpreter.GlobalContext globals locals) =
       case lv ^. lv_compTime of
         Nothing -> gc
-        Just val -> Interpreter.GlobalContext globals $ M.insert id val locals
+        Just val -> Interpreter.GlobalContext globals $ M.insert id (TValue val $ lv ^. lv_typ) locals
     emptyGC :: Interpreter.GlobalContext
     emptyGC = Interpreter.GlobalContext M.empty M.empty
 
