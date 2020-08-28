@@ -89,11 +89,13 @@ data PStruct =
     { ps_name :: String
     , ps_fields :: [(String, Expr)]
     }
+  deriving (Show, Eq)
 
 data PDeclaration
   = DefDecl PDefinition
   | IndDecl PInductive
   | StructDecl PStruct
+  deriving (Show, Eq)
 
 type Program = [PDeclaration]
 

@@ -46,6 +46,7 @@ data GlobalContext =
     { globals :: Map String TValue
     , locals :: Map Int TValue
     }
+  deriving (Show, Eq)
 
 class MonadError Error m =>
       InterpreterMonad m
