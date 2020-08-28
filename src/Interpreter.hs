@@ -155,6 +155,13 @@ makeLenses ''InspectCapturedState
 --   | || | | | ||  __/ |  | |_) | | |  __/ ||  __/ |   
 --  |___|_| |_|\__\___|_|  | .__/|_|  \___|\__\___|_|   
 --                         |_|                          
+interpret :: GlobalContext -> TExpr -> Either RuntimeError TValue
+interpret gc expr@(TExpr typ _) =
+  flip TValue typ <$> (rinter $ interpretTExpr expr)
+  where
+    rinter :: ConcreteInterpreterMonad a -> Either RuntimeError a
+    rinter = runInterpreter gc
+
 interpretTExpr :: InterpreterMonad m => TExpr -> m Value
 interpretTExpr (TExpr typ (Operator op)) = return $ makeOperatorClosure typ op
 interpretTExpr (TExpr typ expr) = interpretExpr expr

@@ -24,7 +24,9 @@ import Data.Vector (Vector)
 import qualified Data.Vector as V
 import Error
 import IR
-import Interpreter hiding (UndefinedVariable, interpret)
+
+-- import Interpreter hiding (UndefinedVariable, interpret)
+import qualified Interpreter
 
 --   _____            _               __  __                       _
 --  |_   _|   _ _ __ (_)_ __   __ _  |  \/  | ___  _ __   __ _  __| |
@@ -49,10 +51,11 @@ data VarStatus
 
 -- | Status of global binding in the program during typing
 data GlobalStatus
-  = Undeclared Decl
+  = Undeclared
+  | Registered Decl
   | DeclInProgress
   | Declared Type Decl
-  | DefInProgress
+  | DefInProgress Type
   | Defined TValue
   deriving (Eq, Ord, Show)
 
@@ -68,12 +71,13 @@ data TypingError
   -- UnknownBuiltin Builtins
   | DifferringRessources Expr Expr
   | LinearUseIllegal String Expr
-  | RuntimeError RuntimeError -- The typer required an evaluation which failed.
+  | RuntimeError Interpreter.RuntimeError -- The typer required an evaluation which failed.
   | TypingCycle -- There is an unsolvable cyclic dependency for typing TODO: Print the cycle
   | InternalError String
   | NotAnArrow TypeBase -- The type is not an arrow
   | DeclarationTypeIsNotAType
   | DeclarationFunctionTypeArgumentNumberMismatch
+  | NotYetTyped Variable
   deriving (Eq, Show)
 
 -- Abstract Typing Monad definition
@@ -82,22 +86,28 @@ class MonadError TypingError m =>
   where
   register :: String -> Decl -> m ()
   decl :: String -> (Decl -> m Type) -> m Type
-  -- ^ Declare a global.
-  -- While the internal computation is in progress, The variable is marked as `InProgress`
+  -- ^ Declare a global.  While the internal computation is in
+  -- progress, The variable is marked as `DeclInProgress`.  If the
+  -- variable has already been declared, does nothing. In case the
+  -- declaration fails, the variable will still be marked as
+  -- registered.
   def :: String -> (Decl -> Type -> m TValue) -> m TValue
+  -- ^ Define a global. While the internal computation is in progress,
+  -- the variable is marked as `DefInProgress`. If the variable has
+  -- already been defined, does nothing. If the definition fails, the
+  -- variable will still be marked as declared.
   addLinear :: String -> Type -> Maybe Value -> m ()
   addUnrestricted :: String -> Type -> Maybe Value -> m ()
-  getValue :: Variable -> m (Maybe Value)
   leaveScope :: m String -- Name of variable which scope we're leaving
   variableStatus :: Variable -> m VarStatus
   globalStatus :: String -> m GlobalStatus
   -- State manipulation
   saveState :: m a -> m a
   hideLinear :: m a -> m a
-  -- The following three might throw UnknownVariable
   useVar :: Variable -> m ()
   varName :: Variable -> m String
   varType :: Variable -> m Type
+  getValue :: Variable -> m (Maybe Value)
   freeVariables :: m (Set Variable)
   interpret :: TExpr -> m TValue
   runTyping :: m a -> Either TypingError a
@@ -117,6 +127,9 @@ data LocalVariable =
     , _lv_compTime :: Maybe Value
     }
   deriving (Eq, Show)
+
+emptyLV :: LocalVariable
+emptyLV = LVar undefined undefined undefined undefined undefined
 
 makeLenses ''LocalVariable
 
@@ -156,126 +169,234 @@ instance MonadState TypingState ConcreteTypingMonad where
   get = CTM get
   put = CTM . put
 
+-- <<<<<<< HEAD
 -- lookupVar :: TypingState -> Variable -> Maybe (Either Type (LocalVariable, Int))
 -- lookupVar (TpState globals _ _) (Global name) =
---   M.lookup name globals >>= return . Left
--- lookupVar (TpState _ locals _) (DeBruijn id) =
---   locals V.!? id >>= return . Right . (, id)
+-- --   M.lookup name globals >>= return . Left
+-- -- lookupVar (TpState _ locals _) (DeBruijn id) =
+-- --   locals V.!? id >>= return . Right . (, id)
+-- instance TypingMonad ConcreteTypingMonad where
+--   register name decl = ts_global %= M.insert name (Undeclared decl)
+--   --
+--   decl = undefined
+--   -- decl name action = do
+--   --   globals <- use ts_global
+--   --   case M.lookup name globals of
+--   --     Just (Undeclared decl) -> do
+--   --       ts_global %= M.insert name DeclInProgress
+--   --       typ <- action decl
+--   --       ts_global %= M.insert name (Declared typ)
+--   --       return typ
+--   --     Just (Declared typ _) -> typ
+--   --     Just (Defined (TValue typ value)) -> typ
+--   --     Just a -> throwError TypingCycle
+--   --     Nothing ->
+--   --       throwError (InternalError "Trying to declare an unregistred variable")
+--     --
+--   def = undefined
+--   -- def name action = do
+--   --   globals <- use ts_global
+--   --   typ <-
+--   --     case M.lookup name globals of
+--   --       Just (Declared typ) -> return typ
+--   --       Just a ->
+--   --         throwError
+--   --           (InternalError
+--   --              ("Defining var" ++ name ++ "but it is in state" ++ show a))
+--   --       Nothing ->
+--   --         throwError (InternalError "Trying to declare an unregistred variable")
+--   --   return ()
+--     --
+--   addLinear name typ mvalue = ts_local %= cons (LVar name typ True False mvalue)
+--     --
+--   addUnrestricted name typ mvalue =
+--     ts_local %= cons (LVar name typ False False mvalue)
+--   --
+-- =======
+collapseGStatus :: Maybe GlobalStatus -> GlobalStatus
+collapseGStatus Nothing = Undeclared
+collapseGStatus (Just s) = s
+
+lookupVar ::
+     TypingState
+  -> Variable
+  -> (Either GlobalStatus (Maybe (LocalVariable, Int)))
+lookupVar (TpState globals _ _) (Global name) =
+  Left $ collapseGStatus $ M.lookup name globals
+lookupVar (TpState _ locals _) (DeBruijn id) = Right $ (, id) <$> locals V.!? id
+
+lookupVarE ::
+     Variable -> ConcreteTypingMonad (Either GlobalStatus (LocalVariable, Int))
+lookupVarE var = do
+  state <- get
+  let result = Typing.lookupVar state var
+  case result of
+    Left Undeclared -> throwError $ UnknownVariable var
+    Left gs -> return $ Left gs
+    Right Nothing -> throwError $ UnknownVariable var
+    Right (Just lv) -> return $ Right lv
+
+addLV :: Bool -> String -> Type -> Maybe Value -> ConcreteTypingMonad ()
+addLV linear name typ mval =
+  ts_local %=
+  V.cons
+    (emptyLV & lv_name .~ name & lv_typ .~ typ & lv_isLinear .~ linear &
+     lv_isUsed .~
+     False &
+     lv_compTime .~
+     mval)
+
+makeGlobalContext :: TypingState -> Interpreter.GlobalContext
+makeGlobalContext (TpState globals locals _) =
+  M.foldrWithKey addGlobal (V.ifoldr addLocal emptyGC locals) globals
+  where
+    addGlobal ::
+         String
+      -> GlobalStatus
+      -> Interpreter.GlobalContext
+      -> Interpreter.GlobalContext
+    addGlobal name (Defined (TValue value _)) (Interpreter.GlobalContext globals locals) =
+      Interpreter.GlobalContext (M.insert name value globals) locals
+    addGlobal _ _ gc = gc
+    addLocal ::
+         Int
+      -> LocalVariable
+      -> Interpreter.GlobalContext
+      -> Interpreter.GlobalContext
+    addLocal id lv gc@(Interpreter.GlobalContext globals locals) =
+      case lv ^. lv_compTime of
+        Nothing -> gc
+        Just val -> Interpreter.GlobalContext globals $ M.insert id val locals
+    emptyGC :: Interpreter.GlobalContext
+    emptyGC = Interpreter.GlobalContext M.empty M.empty
+
 instance TypingMonad ConcreteTypingMonad where
-  register name decl = ts_global %= M.insert name (Undeclared decl)
-  --
-  decl = undefined
-  -- decl name action = do
-  --   globals <- use ts_global
-  --   case M.lookup name globals of
-  --     Just (Undeclared decl) -> do
-  --       ts_global %= M.insert name DeclInProgress
-  --       typ <- action decl
-  --       ts_global %= M.insert name (Declared typ)
-  --       return typ
-  --     Just (Declared typ _) -> typ
-  --     Just (Defined (TValue typ value)) -> typ
-  --     Just a -> throwError TypingCycle
-  --     Nothing ->
-  --       throwError (InternalError "Trying to declare an unregistred variable")
-    --
-  def = undefined
-  -- def name action = do
-  --   globals <- use ts_global
-  --   typ <-
-  --     case M.lookup name globals of
-  --       Just (Declared typ) -> return typ
-  --       Just a ->
-  --         throwError
-  --           (InternalError
-  --              ("Defining var" ++ name ++ "but it is in state" ++ show a))
-  --       Nothing ->
-  --         throwError (InternalError "Trying to declare an unregistred variable")
-  --   return ()
-    --
-  addLinear name typ mvalue = ts_local %= cons (LVar name typ True False mvalue)
-    --
-  addUnrestricted name typ mvalue =
-    ts_local %= cons (LVar name typ False False mvalue)
-  --
+  register name decl = ts_global %= M.insert name (Registered decl)
+  decl name declare = do
+    globals <- use ts_global
+    case collapseGStatus $ M.lookup name globals of
+      Undeclared ->
+        throwError $ InternalError $ "Trying to declare unregistered \"" ++ name ++
+        "\""
+      DeclInProgress ->
+        throwError $ InternalError $ "Trying to declare \"" ++ name ++
+        "\" while it is already being declared"
+      Registered d -> do
+        ts_global %= M.insert name DeclInProgress
+        typ <- declare d
+        catchError
+          (ts_global %= M.insert name (Declared typ d))
+          (\e -> ts_global %= M.insert name (Registered d) >> throwError e)
+        return typ
+      Declared typ _ -> return typ
+      DefInProgress typ -> return typ
+      Defined (TValue _ typ) -> return typ
+  def name define = do
+    globals <- use ts_global
+    case collapseGStatus $ M.lookup name globals of
+      Undeclared ->
+        throwError $ InternalError $ "Trying to define unregistered \"" ++ name ++
+        "\""
+      Registered _ ->
+        throwError $ InternalError $ "Trying to define undeclared \"" ++ name ++
+        "\""
+      DeclInProgress ->
+        throwError $ InternalError $ "Cannot define \"" ++ name ++
+        "\" while it is being declared"
+      DefInProgress _ ->
+        throwError $ InternalError $ "Cannot define \"" ++ name ++
+        "\" while it is already being defined"
+      Declared typ d -> do
+        ts_global %= M.insert name (DefInProgress typ)
+        value <- define d typ
+        catchError
+          (ts_global %= M.insert name (Defined value))
+          (\e -> ts_global %= M.insert name (Declared typ d) >> throwError e)
+        return value
+      Defined val -> return val
+  addLinear = addLV True
+  addUnrestricted = addLV False
   leaveScope = do
-    name <-
-      preuse (ts_local . ix 0) >>=
-      maybe (throwError $ LastScope) (return . (^. lv_name))
+    locals <- use ts_local
+    when (V.null locals) $ throwError LastScope
     ts_local %= V.tail
-    return name
-  --
-  variableStatus = undefined
-  saveState = undefined
-  hideLinear = undefined
+    return $ (V.head locals) ^. lv_name
+  variableStatus var = do
+    state <- get
+    return $
+      case Typing.lookupVar state var of
+        Left Undeclared -> Undefined
+        Left _ -> Unrestricted
+        Right Nothing -> Undefined
+        Right (Just (lv, id)) ->
+          if not (lv ^. lv_isLinear)
+            then Unrestricted
+            else if id + state ^. ts_hidden >= length (state ^. ts_local)
+                   then LinearHidden
+                   else if lv ^. lv_isUsed
+                          then LinearUsed
+                          else LinearFree
+  globalStatus name = do
+    state <- get
+    case Typing.lookupVar state (Global name) of
+      Left gs -> return gs
+      Right _ -> throwError $ InternalError "Reached impossible to reach branch"
+  -- State manipulation
+  saveState action = do
+    state <- get
+    result <- action
+    put state
+    return result
+  hideLinear action = do
+    state <- get
+    let hidden = state ^. ts_hidden
+    let size = V.length $ state ^. ts_local
+    ts_hidden .= size
+    result <- action
+    ts_hidden .= hidden
+    return result
+  -- The following three might throw UnknownVariable
+  useVar (Global _) = return ()
   useVar (DeBruijn id) = do
     var <-
       preuse (ts_local . ix id) >>=
       maybe (throwError $ UnknownVariable $ DeBruijn id) return
-    let usedVar = var & lv_isUsed .~ True
-    ts_local . ix id .= usedVar
-  varName = undefined
-  varType = undefined
-  freeVariables = undefined
-  runTyping = undefined
-  -- variableStatus var = do
-  --   state <- get
-  --   return $
-  --     case lookupVar state var of
-  --       Just (Left _) -> Unrestricted
-  --       Just (Right (lv, id)) ->
-  --         if not (lv ^. lv_isLinear)
-  --           then Unrestricted
-  --           else if id + state ^. ts_hidden >= length (state ^. ts_local)
-  --                  then LinearHidden
-  --                  else if lv ^. lv_isUsed
-  --                         then LinearUsed
-  --                         else LinearFree
-  --       Nothing -> Undefined
-  -- saveState action = do
-  --   state <- get
-  --   result <- action
-  --   put state
-  --   return result
-  -- hideLinear action = do
-  --   state <- get
-  --   let hidden = state ^. ts_hidden
-  --   let size = V.length $ state ^. ts_local
-  --   ts_hidden .= size
-  --   result <- action
-  --   ts_hidden .= hidden
-  --   return result
-  -- useVar (Global _) = return ()
-  -- useVar (DeBruijn id) = do
-  --   var <-
-  --     preuse (ts_local . ix id) >>=
-  --     maybe (throwError $ UnknownVariable $ DeBruijn id) return
-  --   let usedVar = var & lv_isUsed .~ True
-  --   ts_local . ix id .= usedVar
-  -- varName var =
-  --   case var of
-  --     Global name -> return name
-  --     DeBruijn id -> do
-  --       state <- get
-  --       case lookupVar state (DeBruijn id) of
-  --         Just (Right (lv, _)) -> return $ lv ^. lv_name
-  --         _ -> throwError $ UnknownVariable $ DeBruijn id
-  -- varType var = do
-  --   state <- get
-  --   case lookupVar state var of
-  --     Just (Left typ) -> return typ
-  --     Just (Right (lv, _)) -> return $ lv ^. lv_typ
-  --     Nothing -> throwError $ UnknownVariable var
-  -- freeVariables = do
-  --   (TpState _ local _) <- get
-  --   let free =
-  --         filter (not . (^. lv_isUsed) . snd) $
-  --         V.ifoldr (\ix x l -> (ix, x) : l) [] local
-  --   return $ S.fromList $ map (DeBruijn . fst) free
-  -- runTyping (CTM ctm) = runExcept $ evalStateT ctm initState
-  --   where
-  --     initState :: TypingState
-  --     initState = TpState M.empty V.empty 0
+    ts_local . ix id .= (var & lv_isUsed .~ True)
+  varName var =
+    case var of
+      Global name -> return name
+      DeBruijn id ->
+        lookupVarE var >>= \case
+          Right (lv, _) -> return $ lv ^. lv_name
+          _ -> throwError $ InternalError "Reached impossible to reach branch"
+  varType var =
+    lookupVarE var >>= \case
+      Left (Declared typ _) -> return typ
+      Left (DefInProgress typ) -> return typ
+      Left (Defined (TValue _ typ)) -> return typ
+      Left _ -> throwError $ NotYetTyped var
+      Right (lv, _) -> return $ lv ^. lv_typ
+  getValue var =
+    lookupVarE var >>= \case
+      Left (Defined (TValue value _)) -> return $ Just value
+      Right (lv, _) -> return $ lv ^. lv_compTime
+      _ -> return Nothing
+  freeVariables = do
+    local <- use ts_local
+    let free =
+          filter (not . (^. lv_isUsed) . snd) $
+          V.ifoldr (\ix x l -> (ix, x) : l) [] local
+    return $ S.fromList $ map (DeBruijn . fst) free
+  interpret expr = do
+    state <- get
+    let result = Interpreter.interpret (makeGlobalContext state) expr
+    case result of
+      Left runErr -> throwError $ RuntimeError runErr
+      Right tval -> return tval
+  runTyping (CTM ctm) = runExcept $ evalStateT ctm initState
+    where
+      initState :: TypingState
+      initState = TpState M.empty V.empty 0
 
 -- Utils
 --   _   _ _   _ _
