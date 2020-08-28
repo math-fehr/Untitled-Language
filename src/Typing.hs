@@ -2,6 +2,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Typing where
 
@@ -9,6 +11,7 @@ import Control.Lens hiding (Const(..))
 import Control.Lens.Indexed
 import Control.Monad
 import Control.Monad.Except
+import Control.Monad.HT (nest)
 import Control.Monad.State hiding (get, put, state)
 import Control.Monad.State.Class
 import Data.Foldable
@@ -21,7 +24,7 @@ import Data.Vector (Vector)
 import qualified Data.Vector as V
 import Error
 import IR
-import Interpreter hiding (UndefinedVariable)
+import Interpreter hiding (UndefinedVariable, interpret)
 
 --   _____            _               __  __                       _
 --  |_   _|   _ _ __ (_)_ __   __ _  |  \/  | ___  _ __   __ _  __| |
@@ -69,6 +72,8 @@ data TypingError
   | TypingCycle -- There is an unsolvable cyclic dependency for typing TODO: Print the cycle
   | InternalError String
   | NotAnArrow TypeBase -- The type is not an arrow
+  | DeclarationTypeIsNotAType
+  | DeclarationFunctionTypeArgumentNumberMismatch
   deriving (Eq, Show)
 
 -- Abstract Typing Monad definition
@@ -76,10 +81,10 @@ class MonadError TypingError m =>
       TypingMonad m
   where
   register :: String -> Decl -> m ()
-  decl :: String -> (Decl -> m Type) -> m ()
+  decl :: String -> (Decl -> m Type) -> m Type
   -- ^ Declare a global.
   -- While the internal computation is in progress, The variable is marked as `InProgress`
-  def :: String -> (Decl -> Type -> m Value) -> m ()
+  def :: String -> (Decl -> Type -> m TValue) -> m TValue
   addLinear :: String -> Type -> Maybe Value -> m ()
   addUnrestricted :: String -> Type -> Maybe Value -> m ()
   getValue :: Variable -> m (Maybe Value)
@@ -156,26 +161,23 @@ instance MonadState TypingState ConcreteTypingMonad where
 --   M.lookup name globals >>= return . Left
 -- lookupVar (TpState _ locals _) (DeBruijn id) =
 --   locals V.!? id >>= return . Right . (, id)
-instance TypingMonad ConcreteTypingMonad
-  -- register name = ts_global %= M.insert name Undeclared
-                                                           where
-  register name = undefined
+instance TypingMonad ConcreteTypingMonad where
+  register name decl = ts_global %= M.insert name (Undeclared decl)
   --
   decl = undefined
   -- decl name action = do
   --   globals <- use ts_global
   --   case M.lookup name globals of
-  --     Just Undeclared -> return ()
-  --     Just a ->
-  --       throwError
-  --         (InternalError
-  --            ("Declaring var" ++ name ++ "but it is already in state" ++ show a))
+  --     Just (Undeclared decl) -> do
+  --       ts_global %= M.insert name DeclInProgress
+  --       typ <- action decl
+  --       ts_global %= M.insert name (Declared typ)
+  --       return typ
+  --     Just (Declared typ _) -> typ
+  --     Just (Defined (TValue typ value)) -> typ
+  --     Just a -> throwError TypingCycle
   --     Nothing ->
   --       throwError (InternalError "Trying to declare an unregistred variable")
-  --   ts_global %= M.insert name DeclInProgress
-  --   typ <- action
-  --   ts_global %= M.insert name (Declared typ)
-  --   return ()
     --
   def = undefined
   -- def name action = do
@@ -307,15 +309,71 @@ typeProgram (Program decls) =
     runT = runTyping
 
 registerDecl :: TypingMonad m => Decl -> m ()
-registerDecl = undefined
+registerDecl decl =
+  case decl of
+    DDef def -> register (def_name def) decl
+    _ -> throwError (InternalError "Enum and struct decl unimplemented")
 
 -- compute the type of the declaration, potentatially by using other decl or defs.
 declDecl :: TypingMonad m => String -> m Type
-declDecl = undefined
+declDecl name =
+  decl name $ \case
+    DDef DefT {def_name, def_type, def_args, def_body} -> do
+      texpr <- typeExpr def_type
+      vtype <- interpret texpr
+      case vtype of
+        TValue (VType typ) _ -> return typ
+        _ -> throwError DeclarationTypeIsNotAType
+    _ -> throwError (InternalError "Enum and struct decl unimplemented")
+
+desugarDef :: TypingMonad m => Type -> [DebugInfo String] -> Expr -> m Expr
+desugarDef typ l body =
+  case l of
+    [] -> return body
+    h:t ->
+      case base typ of
+        TLinArrow arg tbody -> do
+          body <- desugarDef tbody t body
+          return
+            (Expr SourcePos $
+             Lambda
+               { name = h
+               , linear = True
+               , argtyp =
+                   Expr SourcePos $ Value $ TValue (VType arg) $ Type True TType
+               , body
+               })
+        TUnrArrow arg tbody -> do
+          body <- desugarDef tbody t body
+          return
+            (Expr SourcePos $
+             Lambda
+               { name = h
+               , linear = False
+               , argtyp =
+                   Expr SourcePos $ Value $ TValue (VType arg) $ Type True TType
+               , body
+               })
+        TForallArrow argname arg tbody -> do
+          body <- desugarDef tbody t body
+          return
+            (Expr SourcePos $
+             ForAll
+               h
+               (Expr SourcePos $ Value $ TValue (VType arg) $ Type True TType)
+               body)
+        _ -> throwError DeclarationFunctionTypeArgumentNumberMismatch
 
 -- compute the value of a declaration
 defDecl :: TypingMonad m => String -> m TValue
-defDecl = undefined
+defDecl name =
+  def name $ \decl typ ->
+    case decl of
+      DDef DefT {def_name, def_type, def_args, def_body} -> do
+        expr <- desugarDef typ def_args def_body
+        texpr <- typeExpr expr
+        interpret texpr
+      _ -> throwError (InternalError "Enum and struct decl unimplemented")
 
 typeVariable :: TypingMonad m => String -> Expr -> Variable -> m Type
 typeVariable name e var = do
