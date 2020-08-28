@@ -14,7 +14,6 @@ import System.Directory
 
 import Error
 import IR
-import IRUtils
 import Parser
 import ParsingToIR
 import Typing
@@ -30,14 +29,14 @@ main_tests = do
   return $ testGroup "Tests" [ran_tests]
 
 -- Check a program
-checkAndType :: Parser.Program -> Either Error IR.Program
+checkAndType :: Parser.Program -> Either Error TProgram
 checkAndType parsed_ir = do
-  ir <- parsedProgramToIr parsed_ir
-  checkProgramWellTyped ir
-  return ir
+  prog <- parsedProgramToIr parsed_ir
+  tprog <- typeProgram prog
+  return tprog
 
 -- Parse and check a file
-parseCheckAndType :: FilePath -> IO (Either Error IR.Program)
+parseCheckAndType :: FilePath -> IO (Either Error TProgram)
 parseCheckAndType path = do
   parsed_ir <- Parser.parseFile path
   return $ checkAndType parsed_ir
@@ -47,12 +46,13 @@ parseCheckAndType path = do
 run_make_test :: FilePath -> IO TestTree
 run_make_test path = do
   prog <- parseCheckAndType path
-  case prog of
-    Right p ->
-      let res = callByValue p $ getExprFromDef $ (p ^. prog_defs) ! "main"
-       in return $
-          testCase ("Running" ++ show path) $ res @?= Const (IR.IntConst 0)
-    Left err -> assertFailure $ "Error : " ++ show err
+  return $
+    testCase ("Running" ++ show path) $
+    case prog of
+      Right p -> assertFailure $ show p
+        -- TODO replace this by check for correct result in main
+        -- res @?= Const (IR.IntConst 0)
+      Left err -> assertFailure $ "Error : " ++ show err
 
 -- Run all main function in files in "./examples/run"
 run_tests :: IO TestTree
