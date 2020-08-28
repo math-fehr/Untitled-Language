@@ -139,12 +139,20 @@ mockTyperT (ForAll name _ body) = ForAll name undefined $ mockTyper body
 mockTypeFile :: Parser.Program -> GlobalContext
 mockTypeFile prog =
   flip GlobalContext M.empty $
-  foldr addGlobal (M.fromList [("true", TValue (VBool True) (Type True TType)), ("false", TValue (VBool False) (Type True TType))]) $
+  foldr
+    addGlobal
+    (M.fromList
+       [ ("true", TValue (VBool True) (Type True TType))
+       , ("false", TValue (VBool False) (Type True TType))
+       ]) $
   prog_defs defs
   where
     addGlobal :: Decl -> Map String TValue -> Map String TValue
     addGlobal (DDef (DefT name _ args body)) globals =
-      M.insert name (TValue (VFun [] (length args) $ mockTyper body) (Type True TType)) globals
+      M.insert
+        name
+        (TValue (VFun [] (length args) $ mockTyper body) (Type True TType))
+        globals
     addGlobal _ globals = globals
     defs :: Program
     Right defs = parsedProgramToIr prog
