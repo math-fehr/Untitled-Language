@@ -404,7 +404,8 @@ typeProgram :: Program -> Either Error TProgram
 typeProgram (Program decls) =
   runT $ do
     forM_ decls registerDecl
-    return M.empty
+    state <- get
+    return $ Interpreter.globals $ makeGlobalContext state
   where
     runT :: ConcreteTypingMonad a -> Either Error a
     runT = runTyping
