@@ -13,9 +13,9 @@ import Data.List
 import Data.Map ((!))
 import System.Directory
 
+import Error
 import IR
 import Typing
-import Error
 
 main :: IO ()
 main = do

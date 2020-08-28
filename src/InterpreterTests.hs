@@ -13,11 +13,11 @@ import qualified Data.Map as M
 import System.Directory
 import Text.Parsec (parse)
 
+import Error
 import IR
 import Interpreter hiding (interpret)
 import qualified Parser
 import ParsingToIR
-import Error
 
 main :: IO ()
 main = do
