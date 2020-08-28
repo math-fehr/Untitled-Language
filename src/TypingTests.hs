@@ -15,6 +15,7 @@ import System.Directory
 
 import IR
 import Typing
+import Error
 
 main :: IO ()
 main = do
@@ -30,7 +31,7 @@ tests = do
 data TypingMonadTest m where
   TMTestEq :: (Eq a, Show a) => String -> a -> m a -> TypingMonadTest m
   TMTestFailure
-    :: (Show a) => String -> (TypingError -> Bool) -> m a -> TypingMonadTest m
+    :: (Show a) => String -> (Error -> Bool) -> m a -> TypingMonadTest m
 
 runTest :: TypingMonad m => TypingMonadTest m -> TestTree
 runTest (TMTestEq name expected action) =
@@ -47,15 +48,15 @@ runTest (TMTestFailure name checkErr action) =
         then True @?= True
         else assertFailure $ "Expected another failure, got " ++ show err
 
-internalP :: TypingError -> Bool
+internalP :: Error -> Bool
 internalP (InternalError _) = True
 internalP _ = False
 
-unknownP :: TypingError -> Bool
+unknownP :: Error -> Bool
 unknownP (UnknownVariable _) = True
 unknownP _ = False
 
-reuseP :: TypingError -> Bool
+reuseP :: Error -> Bool
 reuseP (ReusedLinear _ _) = True
 reuseP _ = False
 

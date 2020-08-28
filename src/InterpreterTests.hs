@@ -17,6 +17,7 @@ import IR
 import Interpreter hiding (interpret)
 import qualified Parser
 import ParsingToIR
+import Error
 
 main :: IO ()
 main = do
@@ -29,10 +30,10 @@ tests = do
   file_tests <- interpreter_file_tests
   return $ testGroup "Interpreter" [interpreter_ast_tests, file_tests]
 
-interpret :: TExpr -> Either RuntimeError Value
+interpret :: TExpr -> Either Error Value
 interpret expr = rinter $ interpretTExpr expr
   where
-    rinter :: ConcreteInterpreterMonad a -> Either RuntimeError a
+    rinter :: ConcreteInterpreterMonad a -> Either Error a
     rinter = runInterpreter (GlobalContext M.empty M.empty)
 
 deftyp :: Type
@@ -174,6 +175,6 @@ file_make_test path expected = do
               Left e -> assertFailure $ "Runtime error : " ++ show e
               Right val -> val @?= expected
   where
-    rinter :: GlobalContext -> TExpr -> Either RuntimeError Value
+    rinter :: GlobalContext -> TExpr -> Either Error Value
     rinter ctx expr =
       runInterpreter ctx (interpretTExpr expr :: ConcreteInterpreterMonad Value)
