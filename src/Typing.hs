@@ -61,6 +61,7 @@ data GlobalStatus
 
 data TypingError
   = ExpectedType Expr Type Type -- Expression, expected type, and real type
+  | ExpectedIntType Expr Type -- Expression, and real type
   | ReusedLinear String Expr -- Variable name, expression,
                              -- and expression in which it's used
   | UnusedLinear String Expr -- Same
@@ -544,19 +545,23 @@ typeExpr' (Expr _ (IfThenElse cond thenE elseE)) = do
   when (thenV /= elseV) $ throwError $ DifferringRessources thenE elseE
   when (thenT /= elseT) $ throwError $ ExpectedType elseE thenT elseT
   return $ TExpr thenT $ IfThenElse tecond tethen teelse
+typeExpr' (Expr _ (Call (Expr _ (Operator Plus)) arg)) = typeCallOp Plus arg
+typeExpr' (Expr _ (Call (Expr _ (Operator Minus)) arg)) = typeCallOp Minus arg
+typeExpr' (Expr _ (Call (Expr _ (Operator Times)) arg)) = typeCallOp Times arg
+typeExpr' (Expr _ (Call (Expr _ (Operator Div)) arg)) = typeCallOp Div arg
 typeExpr' (Expr _ (Call funE argE)) = do
-  tefun@(TExpr (Type _ tfun) _) <- typeExpr funE
+  tefun@(TExpr (Type ctfun tfun) _) <- typeExpr funE
   case tfun of
-    TLinArrow expectedArgT bodyT -> do
+    TLinArrow expectedArgT (Type ctbody tbody) -> do
       tearg@(TExpr targ _) <- typeExpr argE
       when (targ /= expectedArgT) $ throwError $
         ExpectedType argE expectedArgT targ
-      return $ TExpr bodyT $ Call tefun tearg
-    TUnrArrow expectedArgT bodyT -> do
+      return $ TExpr (Type (ctbody && ctfun) tbody) $ Call tefun tearg
+    TUnrArrow expectedArgT (Type ctbody tbody) -> do
       tearg@(TExpr targ _) <- hideLinear $ typeExpr argE
       when (targ /= expectedArgT) $ throwError $
         ExpectedType argE expectedArgT targ
-      return $ TExpr bodyT $ Call tefun tearg
+      return $ TExpr (Type (ctbody && ctfun) tbody) $ Call tefun tearg
     _ -> throwError $ NotAnArrow tfun
 typeExpr' (Expr _ (Tuple es)) = do
   tees <- mapM typeExpr es
@@ -591,8 +596,41 @@ typeExpr' (Expr _ (ForAll (DI name) typ expr)) = do
   return $ TExpr (Type True TType) $ Value $
     TValue (VType $ Type True $ TForallArrow (DI name) typ' expr') $
     Type True TType
-typeExpr' (Expr _ (Operator _)) =
-  throwError (InternalError "typing of operators unimplemented")
+typeExpr' (Expr _ (Operator Arrow)) =
+  let ttype = Type True TType
+      arrowtype = TUnrArrow ttype $ Type True $ (TUnrArrow ttype ttype)
+   in return $ TExpr (Type True arrowtype) (Operator Arrow)
+typeExpr' (Expr _ (Operator LinArrow)) =
+  let ttype = Type True TType
+      arrowtype = TUnrArrow ttype $ Type True $ (TUnrArrow ttype ttype)
+   in return $ TExpr (Type True arrowtype) (Operator LinArrow)
+typeExpr' (Expr _ (Operator op)) =
+  throwError (InternalError $ "Operator" ++ show op ++ "implemented")
+
+typeCallOp :: TypingMonad m => Operator -> Expr -> m TExpr
+typeCallOp op arg = do
+  tearg@(TExpr targ@(Type ctarg tbarg) varg) <- typeExpr arg
+  case op of
+    _
+      | op == Plus || op == Minus || op == Times || op == Div ->
+        case tbarg of
+          TInt intType ->
+            let funType = binopType True (TInt intType)
+             in return $ TExpr (typeAfterCall ctarg funType) $
+                Call (TExpr funType (Operator Plus)) tearg
+          _ -> throwError (ExpectedIntType arg targ)
+
+binopType :: Bool -> TypeBase -> Type
+binopType comptime typ =
+  Type
+    comptime
+    (TLinArrow
+       (Type False typ)
+       (Type True $ TLinArrow (Type False typ) (Type False typ)))
+
+typeAfterCall :: Bool -> Type -> Type
+typeAfterCall comptime (Type comptimeFun (TLinArrow arg (Type _ body))) =
+  Type (comptime && comptimeFun) body
 
 typeExprToType :: TypingMonad m => Expr -> m (Type)
 typeExprToType e = do
