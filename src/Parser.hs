@@ -334,7 +334,10 @@ declarationParser =
 
 -- Main parser
 programParser :: Parser Program
-programParser = whiteSpace >> many declarationParser
+programParser = do
+  prog <- whiteSpace >> many declarationParser
+  eof
+  return $ prog
 
 parseExprFromString :: String -> IO Expr
 parseExprFromString str =
