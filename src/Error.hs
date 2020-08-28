@@ -3,32 +3,26 @@ module Error where
 import IR
 
 data Error
-  = DuplicateDefinition String
-  | UndefinedReference String
-  | ShouldBeType Expr Expr Expr
-  | NotAFunction Expr Expr
-  | ExpectedConstrutor String
-  | NoCases
-  | MatchHeterogeneous
-  | DuplicateCase String
-  | MissingCase String
-
-instance Show Error where
-  show (DuplicateDefinition ident) = "Duplicate definition of " ++ ident
-  show (UndefinedReference def) = "Undefined reference to " ++ show def
-  show (ShouldBeType expr typ expected_typ) =
-    show expr ++
-    " is of type " ++ show typ ++ " but should be of type " ++ show expected_typ
-  show (NotAFunction expr typ) =
-    "Expression " ++
-    show expr ++ " of type " ++ show typ ++ " is not a function"
-  show (ExpectedConstrutor expr) =
-    "Identifier " ++ expr ++ " is expected to be a constructor"
-  show NoCases = "Pattern matching should contain at least one case"
-  show MatchHeterogeneous =
-    "Found pattern matching with constructors of different types"
-  show (DuplicateCase s) =
-    "Duplicate case in pattern-matching: branch with constructor " ++
-    show s ++ " defined twice."
-  show (MissingCase s) =
-    "Missing case with constructor " ++ s ++ " in pattern matching"
+  = ExpectedType Expr Type Type -- Expression, expected type, and real type
+  | ExpectedIntType Expr Type -- Expression, and real type
+  | ReusedLinear String Expr -- Variable name, expression,
+                             -- and expression in which it's used
+  | UnusedLinear String Expr -- Same
+  | UndefinedVariable String Expr -- Same
+  | UndefinedVariableInterpreter Variable
+  | NotAType Expr -- Expression is not a type
+  | UnknownVariable Variable
+  | LastScope
+  -- UnknownBuiltin Builtins
+  | DifferringRessources Expr Expr
+  | LinearUseIllegal String Expr
+  | TypingCycle -- There is an unsolvable cyclic dependency for typing TODO: Print the cycle
+  | InternalError String
+  | NotAnArrow TypeBase -- The type is not an arrow
+  | DeclarationTypeIsNotAType
+  | DeclarationFunctionTypeArgumentNumberMismatch
+  | NotYetTyped Variable
+  | DivisionByZero
+  | Unimplemented String
+  | TypeSystemUnsound String
+  deriving (Eq, Show)

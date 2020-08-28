@@ -59,30 +59,8 @@ data GlobalStatus
   | Defined TValue
   deriving (Eq, Ord, Show)
 
-data TypingError
-  = ExpectedType Expr Type Type -- Expression, expected type, and real type
-  | ExpectedIntType Expr Type -- Expression, and real type
-  | ReusedLinear String Expr -- Variable name, expression,
-                             -- and expression in which it's used
-  | UnusedLinear String Expr -- Same
-  | UndefinedVariable String Expr -- Same
-  | NotAType Expr -- Expression is not a type
-  | UnknownVariable Variable
-  | LastScope
-  -- UnknownBuiltin Builtins
-  | DifferringRessources Expr Expr
-  | LinearUseIllegal String Expr
-  | RuntimeError Interpreter.RuntimeError -- The typer required an evaluation which failed.
-  | TypingCycle -- There is an unsolvable cyclic dependency for typing TODO: Print the cycle
-  | InternalError String
-  | NotAnArrow TypeBase -- The type is not an arrow
-  | DeclarationTypeIsNotAType
-  | DeclarationFunctionTypeArgumentNumberMismatch
-  | NotYetTyped Variable
-  deriving (Eq, Show)
-
 -- Abstract Typing Monad definition
-class MonadError TypingError m =>
+class MonadError Error m =>
       TypingMonad m
   where
   register :: String -> Decl -> m ()
@@ -111,7 +89,7 @@ class MonadError TypingError m =>
   getValue :: Variable -> m (Maybe Value)
   freeVariables :: m (Set Variable)
   interpret :: TExpr -> m TValue
-  runTyping :: m a -> Either TypingError a
+  runTyping :: m a -> Either Error a
 
 -- Concrete typing monad
 --    ___                     _
@@ -144,8 +122,7 @@ data TypingState =
 
 makeLenses ''TypingState
 
-type ConcreteTypingMonad_ a
-   = StateT TypingState (ExceptT TypingError Identity) a
+type ConcreteTypingMonad_ a = StateT TypingState (ExceptT Error Identity) a
 
 newtype ConcreteTypingMonad a =
   CTM
@@ -162,7 +139,7 @@ instance Applicative ConcreteTypingMonad where
 instance Monad ConcreteTypingMonad where
   (CTM x) >>= f = CTM $ x >>= (unCTM . f)
 
-instance MonadError TypingError ConcreteTypingMonad where
+instance MonadError Error ConcreteTypingMonad where
   throwError = CTM . throwError
   catchError (CTM def) handler = CTM $ catchError def $ unCTM . handler
 
@@ -394,7 +371,7 @@ instance TypingMonad ConcreteTypingMonad where
     state <- get
     let result = Interpreter.interpret (makeGlobalContext state) expr
     case result of
-      Left runErr -> throwError $ RuntimeError runErr
+      Left runErr -> throwError $ runErr
       Right tval -> return tval
   runTyping (CTM ctm) = runExcept $ evalStateT ctm initState
     where
@@ -423,13 +400,13 @@ x >>=^ f = x >>= \y -> f y >> return y
 -- --   / ___ \| | (_| | (_) | |  | | |_| | | | | | | | |
 -- --  /_/   \_\_|\__, |\___/|_|  |_|\__|_| |_|_| |_| |_|
 -- --             |___/
-typeProgram :: Program -> Either TypingError TProgram
+typeProgram :: Program -> Either Error TProgram
 typeProgram (Program decls) =
   runT $ do
     forM_ decls registerDecl
     return M.empty
   where
-    runT :: ConcreteTypingMonad a -> Either TypingError a
+    runT :: ConcreteTypingMonad a -> Either Error a
     runT = runTyping
 
 registerDecl :: TypingMonad m => Decl -> m ()
@@ -505,7 +482,7 @@ typeVariable name e var = do
   case state of
     LinearUsed -> throwError $ ReusedLinear name e
     LinearHidden -> throwError $ LinearUseIllegal name e
-    Undefined -> throwError $ Typing.UndefinedVariable name e
+    Undefined -> throwError $ UndefinedVariable name e
     _ -> useVar var >> varType var
 
 typeExpr :: TypingMonad m => Expr -> m TExpr

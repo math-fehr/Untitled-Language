@@ -41,23 +41,16 @@ import IR
 --   / _ \| '_ (_-<  _| '_/ _` / _|  _|
 --  /_/ \_\_.__/__/\__|_| \__,_\__|\__|
 --                                     
-data RuntimeError
-  = DivisionByZero
-  | Unimplemented String
-  | TypeSystemUnsound String
-  | UndefinedVariable Variable
-  deriving (Eq, Show)
-
 data GlobalContext =
   GlobalContext
     { globals :: Map String TValue
     , locals :: Map Int TValue
     }
 
-class MonadError RuntimeError m =>
+class MonadError Error m =>
       InterpreterMonad m
   where
-  runInterpreter :: GlobalContext -> m a -> Either RuntimeError a
+  runInterpreter :: GlobalContext -> m a -> Either Error a
   getValue :: Variable -> m Value
   withValue :: Value -> m b -> m b
 
@@ -77,7 +70,7 @@ data InterpreterState =
 makeLenses ''InterpreterState
 
 type ConcreteInterpreterMonad_ a
-   = StateT InterpreterState (ExceptT RuntimeError Identity) a
+   = StateT InterpreterState (ExceptT Error Identity) a
 
 newtype ConcreteInterpreterMonad a =
   CIM
@@ -94,7 +87,7 @@ instance Applicative ConcreteInterpreterMonad where
 instance Monad ConcreteInterpreterMonad where
   (CIM x) >>= f = CIM $ x >>= (unCIM . f)
 
-instance MonadError RuntimeError ConcreteInterpreterMonad where
+instance MonadError Error ConcreteInterpreterMonad where
   throwError = CIM . throwError
   catchError (CIM def) handler = CIM $ catchError def $ unCIM . handler
 
@@ -109,7 +102,8 @@ lookupVar (ItState _ locals) (DeBruijn id) = join $ locals V.!? id
 instance InterpreterMonad ConcreteInterpreterMonad where
   getValue var =
     get >>=
-    maybe (throwError $ UndefinedVariable var) return . flip lookupVar var
+    maybe (throwError $ UndefinedVariableInterpreter var) return .
+    flip lookupVar var
   withValue val action = do
     is_local %= cons (Just val)
     result <- action
@@ -155,11 +149,11 @@ makeLenses ''InspectCapturedState
 --   | || | | | ||  __/ |  | |_) | | |  __/ ||  __/ |   
 --  |___|_| |_|\__\___|_|  | .__/|_|  \___|\__\___|_|   
 --                         |_|                          
-interpret :: GlobalContext -> TExpr -> Either RuntimeError TValue
+interpret :: GlobalContext -> TExpr -> Either Error TValue
 interpret gc expr@(TExpr typ _) =
   flip TValue typ <$> (rinter $ interpretTExpr expr)
   where
-    rinter :: ConcreteInterpreterMonad a -> Either RuntimeError a
+    rinter :: ConcreteInterpreterMonad a -> Either Error a
     rinter = runInterpreter gc
 
 interpretTExpr :: InterpreterMonad m => TExpr -> m Value
