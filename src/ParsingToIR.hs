@@ -46,11 +46,11 @@ manyOpBuiltins =
   M.fromList [(MAmpersand, IR.Ampersand), (MBar, IR.Bar), (MHat, IR.Hat)]
 
 -- Get an expression from an identifier
-getExprFromIdent :: String -> PIRContext -> Maybe IR.Expr
-getExprFromIdent str (PIRContext local)
-  | str `elem` local =
-    Expr SourcePos <$> LocalVar (DI str) <$> elemIndex str local
-  | otherwise = Just $ Expr SourcePos $ Def str
+getExprFromIdent :: String -> PIRContext -> IR.Expr
+getExprFromIdent str (PIRContext local) =
+  case elemIndex str local of
+    Just pos -> Expr SourcePos $ LocalVar (DI str) pos
+    Nothing -> Expr SourcePos $ Def str
 
 -- Add a local variable with de bruijn index 0 to the context
 addLocalVar :: String -> PIRContext -> PIRContext
@@ -58,11 +58,7 @@ addLocalVar str = pirctx_local %~ (str :)
 
 -- Transform a parsed expression to an IR expression
 exprToIr :: Parser.Expr -> PIRContext -> Either Error IR.Expr
-exprToIr (Var "Int") _ = return $ Expr SourcePos $ Def "Int"
-exprToIr (Var str) ctx =
-  case getExprFromIdent str ctx of
-    Just res -> return res
-    Nothing -> Left $ UndefinedReference str
+exprToIr (Var str) ctx = return $ getExprFromIdent str ctx
 exprToIr (Parser.IntConst i) _ =
   return $
   Expr SourcePos $
