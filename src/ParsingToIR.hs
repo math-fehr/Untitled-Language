@@ -111,7 +111,7 @@ defToIr (PDefinition name args body typ) ctx = do
   let args' = DI <$> args
   typ' <- exprToIr typ ctx
   let ctx' = foldl (flip addLocalVar) ctx args
-  body' <- exprToIr body ctx
+  body' <- exprToIr body ctx'
   return $ DDef $ DefT name typ' args' body'
 
 indTypToIr ::
