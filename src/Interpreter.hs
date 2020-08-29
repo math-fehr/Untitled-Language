@@ -51,7 +51,6 @@ data GlobalContext =
 class MonadError Error m =>
       InterpreterMonad m
   where
-  runInterpreter :: GlobalContext -> m a -> Either Error a
   getValue :: Variable -> m Value
   withValue :: Value -> m b -> m b
 
@@ -70,37 +69,41 @@ data InterpreterState =
 
 makeLenses ''InterpreterState
 
-type ConcreteInterpreterMonad_ a
-   = StateT InterpreterState (ExceptT Error Identity) a
+type ConcreteInterpreterMonad_ m a
+   = StateT InterpreterState (ExceptT Error m) a
 
-newtype ConcreteInterpreterMonad a =
+newtype ConcreteInterpreterMonadT m a =
   CIM
-    { unCIM :: ConcreteInterpreterMonad_ a
+    { unCIM :: ConcreteInterpreterMonad_ m a
     }
 
-instance Functor ConcreteInterpreterMonad where
+instance Functor m => Functor (ConcreteInterpreterMonadT m) where
   fmap f = CIM . fmap f . unCIM
 
-instance Applicative ConcreteInterpreterMonad where
+instance Monad m => Applicative (ConcreteInterpreterMonadT m) where
   pure = CIM . pure
   (CIM f) <*> (CIM x) = CIM $ f <*> x
 
-instance Monad ConcreteInterpreterMonad where
+instance Monad m => Monad (ConcreteInterpreterMonadT m) where
   (CIM x) >>= f = CIM $ x >>= (unCIM . f)
 
-instance MonadError Error ConcreteInterpreterMonad where
+instance Monad m => MonadError Error (ConcreteInterpreterMonadT m) where
   throwError = CIM . throwError
   catchError (CIM def) handler = CIM $ catchError def $ unCIM . handler
 
-instance MonadState InterpreterState ConcreteInterpreterMonad where
+instance Monad m =>
+         MonadState InterpreterState (ConcreteInterpreterMonadT m) where
   get = CIM get
   put = CIM . put
+
+instance MonadTrans ConcreteInterpreterMonadT where
+  lift = CIM . lift . lift
 
 lookupVar :: InterpreterState -> Variable -> Maybe Value
 lookupVar (ItState globals _) (Global name) = M.lookup name globals
 lookupVar (ItState _ locals) (DeBruijn id) = join $ locals V.!? id
 
-instance InterpreterMonad ConcreteInterpreterMonad where
+instance Monad m => InterpreterMonad (ConcreteInterpreterMonadT m) where
   getValue var =
     get >>=
     maybe (throwError $ UndefinedVariableInterpreter var) return .
@@ -110,15 +113,27 @@ instance InterpreterMonad ConcreteInterpreterMonad where
     result <- action
     is_local %= V.tail
     return result
-  runInterpreter (GlobalContext globals ids) (CIM action) =
-    runExcept $ evalStateT action initState
-    where
-      initState :: InterpreterState
-      initState = ItState (fmap extractV globals) stack
-      stack :: Vector (Maybe Value)
-      stack = fmap extractV <$> V.generate size (flip M.lookup ids)
-      size :: Int
-      size = M.foldrWithKey (\k -> const $ max k) 0 ids
+
+runInterpreterT ::
+     Monad m
+  => GlobalContext
+  -> ConcreteInterpreterMonadT m a
+  -> m (Either Error a)
+runInterpreterT (GlobalContext globals ids) (CIM action) =
+  runExceptT $ evalStateT action initState
+  where
+    initState :: InterpreterState
+    initState = ItState (fmap extractV globals) stack
+    stack :: Vector (Maybe Value)
+    stack = fmap extractV <$> V.generate size (flip M.lookup ids)
+    size :: Int
+    size = M.foldrWithKey (\k -> const $ max k) 0 ids
+
+type ConcreteInterpreterMonad a = ConcreteInterpreterMonadT Identity a
+
+runInterpreter ::
+     GlobalContext -> ConcreteInterpreterMonad a -> Either Error a
+runInterpreter gc = runIdentity . runInterpreterT gc
 
 -- Utils
 --   _   _ _   _ _     
