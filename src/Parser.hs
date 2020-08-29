@@ -107,6 +107,7 @@ languageDef =
     , Token.commentLine = "//"
     , Token.identStart = letter
     , Token.identLetter = alphaNum
+    , Token.nestedComments = True
     , Token.reservedNames =
         [ "let"
         , "in"

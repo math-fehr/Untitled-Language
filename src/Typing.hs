@@ -24,6 +24,7 @@ import Data.Vector (Vector)
 import qualified Data.Vector as V
 import Error
 import IR
+import ULPrelude (prelude)
 
 -- import Interpreter hiding (UndefinedVariable, interpret)
 import qualified Interpreter
@@ -91,6 +92,7 @@ class MonadError Error m =>
   interpret :: TExpr -> m TValue
   runTyping :: m a -> Either Error a
   getTProgram :: m TProgram
+  loadTProgram :: TProgram -> m ()
 
 -- Concrete typing monad
 --    ___                     _
@@ -232,7 +234,6 @@ makeTProgram (TpState globals _ _) = M.foldrWithKey addGlobal M.empty globals
     addGlobal name (Defined tvalue) g = M.insert name tvalue g
     addGlobal _ _ gc = gc
 
-makeGlobalContext :: TypingState -> Interpreter.GlobalContext
 makeGlobalContext (TpState globals locals _) =
   M.foldrWithKey addGlobal (V.ifoldr addLocal emptyGC locals) globals
   where
@@ -382,6 +383,12 @@ instance TypingMonad ConcreteTypingMonad where
       Left runErr -> throwError $ runErr
       Right tval -> return tval
   getTProgram = makeTProgram <$> get
+  loadTProgram tprogram = do
+    globals <- use ts_global
+    ts_global .= M.foldrWithKey addGlobal globals tprogram
+    return ()
+    where
+      addGlobal name tvalue = M.insert name (Defined tvalue)
   runTyping (CTM ctm) = runExcept $ evalStateT ctm initState
     where
       initState :: TypingState
@@ -412,6 +419,7 @@ x >>=^ f = x >>= \y -> f y >> return y
 typeProgram :: Program -> Either Error TProgram
 typeProgram (Program decls) =
   runT $ do
+    loadTProgram prelude
     forM_ decls registerDecl
     forM_ names declDecl
     forM_ names defDecl

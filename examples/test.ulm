@@ -1,7 +1,7 @@
-
+/*
 def not : (a: bool) -o bool :=
     if a then false else true
-
+/*
 decl not : T -> array T 3 def not a := ...
 
 
@@ -45,6 +45,8 @@ def aborc : (a: bool) -> (b: bool) -> (c: bool) -> bool :=
 
 def alwaystrue : (a: bool) -> bool :=
     (aborc (id a) (not (applytwice id a))) (not (not a))
+
+*/
 
 /* type : leaf or sum of prod and nothing else
    sum & prod : Each field may have a debug name.
@@ -145,4 +147,5 @@ struct = proc + implicit field decl.
 
    [ a; b ; c ; d ] -> array of size 4
    a :: b :: c :: Nil
+*/
 */

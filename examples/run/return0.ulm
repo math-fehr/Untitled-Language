@@ -1,2 +1,2 @@
-decl main : int
+decl main : Int
 def := 0

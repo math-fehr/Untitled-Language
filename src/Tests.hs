@@ -10,6 +10,7 @@ import Test.Tasty.HUnit
 import Control.Lens ((^.))
 import Data.List
 import Data.Map ((!))
+import qualified Data.Map as M
 import System.Directory
 
 import Error
@@ -49,7 +50,11 @@ run_make_test path = do
   return $
     testCase ("Running" ++ show path) $
     case prog of
-      Right p -> assertFailure $ show p
+      Right p ->
+        case M.lookup "main" p of
+          Just (TValue (VInt 0) _) -> return ()
+          Just _ -> assertFailure "main did not return 0"
+          Nothing -> assertFailure "main is not defined"
         -- TODO replace this by check for correct result in main
         -- res @?= Const (IR.IntConst 0)
       Left err -> assertFailure $ "Error : " ++ show err
