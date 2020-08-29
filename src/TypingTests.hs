@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE Rank2Types #-}
 
 module Main where
 
@@ -33,15 +34,19 @@ data TypingMonadTest m where
   TMTestFailure
     :: (Show a) => String -> (Error -> Bool) -> m a -> TypingMonadTest m
 
-runTest :: TypingMonad m => TypingMonadTest m -> TestTree
-runTest (TMTestEq name expected action) =
+runTest ::
+     TypingMonad m
+  => (forall a. m a -> Either TypingError a)
+  -> TypingMonadTest m
+  -> TestTree
+runTest runT (TMTestEq name expected action) =
   testCase name $
-  case runTyping action of
+  case runT action of
     Left err -> assertFailure $ "Typing failed with " ++ show err
     Right x -> x @?= expected
-runTest (TMTestFailure name checkErr action) =
+runTest runT (TMTestFailure name checkErr action) =
   testCase name $
-  case runTyping action of
+  case runT action of
     Right x -> assertFailure $ "Expected failure, got \"" ++ show x ++ "\""
     Left err ->
       if checkErr err
@@ -94,6 +99,6 @@ typing_monad_tests =
     "Monad"
     [ testGroup "ConcreteTypingMonad" $
       fmap
-        runTest
+        (runTest runTyping)
         (typing_monad_tests_data :: [TypingMonadTest ConcreteTypingMonad])
     ]

@@ -90,7 +90,6 @@ class MonadError Error m =>
   getValue :: Variable -> m (Maybe Value)
   freeVariables :: m (Set Variable)
   interpret :: TExpr -> m TValue
-  runTyping :: m a -> Either Error a
   getTProgram :: m TProgram
   loadTProgram :: TProgram -> m ()
 
@@ -125,75 +124,34 @@ data TypingState =
 
 makeLenses ''TypingState
 
-type ConcreteTypingMonad_ a = StateT TypingState (ExceptT Error Identity) a
+type ConcreteTypingMonad_ m a = StateT TypingState (ExceptT Error m) a
 
-newtype ConcreteTypingMonad a =
+newtype ConcreteTypingMonadT m a =
   CTM
-    { unCTM :: ConcreteTypingMonad_ a
+    { unCTM :: ConcreteTypingMonad_ m a
     }
 
-instance Functor ConcreteTypingMonad where
+instance Functor f => Functor (ConcreteTypingMonadT f) where
   fmap f (CTM x) = CTM $ f <$> x
 
-instance Applicative ConcreteTypingMonad where
+instance Monad m => Applicative (ConcreteTypingMonadT m) where
   pure = CTM . pure
   (CTM f) <*> (CTM x) = CTM $ f <*> x
 
-instance Monad ConcreteTypingMonad where
+instance Monad m => Monad (ConcreteTypingMonadT m) where
   (CTM x) >>= f = CTM $ x >>= (unCTM . f)
 
-instance MonadError Error ConcreteTypingMonad where
+instance Monad m => MonadError Error (ConcreteTypingMonadT m) where
   throwError = CTM . throwError
   catchError (CTM def) handler = CTM $ catchError def $ unCTM . handler
 
-instance MonadState TypingState ConcreteTypingMonad where
+instance Monad m => MonadState TypingState (ConcreteTypingMonadT m) where
   get = CTM get
   put = CTM . put
 
--- <<<<<<< HEAD
--- lookupVar :: TypingState -> Variable -> Maybe (Either Type (LocalVariable, Int))
--- lookupVar (TpState globals _ _) (Global name) =
--- --   M.lookup name globals >>= return . Left
--- -- lookupVar (TpState _ locals _) (DeBruijn id) =
--- --   locals V.!? id >>= return . Right . (, id)
--- instance TypingMonad ConcreteTypingMonad where
---   register name decl = ts_global %= M.insert name (Undeclared decl)
---   --
---   decl = undefined
---   -- decl name action = do
---   --   globals <- use ts_global
---   --   case M.lookup name globals of
---   --     Just (Undeclared decl) -> do
---   --       ts_global %= M.insert name DeclInProgress
---   --       typ <- action decl
---   --       ts_global %= M.insert name (Declared typ)
---   --       return typ
---   --     Just (Declared typ _) -> typ
---   --     Just (Defined (TValue typ value)) -> typ
---   --     Just a -> throwError TypingCycle
---   --     Nothing ->
---   --       throwError (InternalError "Trying to declare an unregistred variable")
---     --
---   def = undefined
---   -- def name action = do
---   --   globals <- use ts_global
---   --   typ <-
---   --     case M.lookup name globals of
---   --       Just (Declared typ) -> return typ
---   --       Just a ->
---   --         throwError
---   --           (InternalError
---   --              ("Defining var" ++ name ++ "but it is in state" ++ show a))
---   --       Nothing ->
---   --         throwError (InternalError "Trying to declare an unregistred variable")
---   --   return ()
---     --
---   addLinear name typ mvalue = ts_local %= cons (LVar name typ True False mvalue)
---     --
---   addUnrestricted name typ mvalue =
---     ts_local %= cons (LVar name typ False False mvalue)
---   --
--- =======
+instance MonadTrans ConcreteTypingMonadT where
+  lift = CTM . lift . lift
+
 collapseGStatus :: Maybe GlobalStatus -> GlobalStatus
 collapseGStatus Nothing = Undeclared
 collapseGStatus (Just s) = s
@@ -207,7 +165,9 @@ lookupVar (TpState globals _ _) (Global name) =
 lookupVar (TpState _ locals _) (DeBruijn id) = Right $ (, id) <$> locals V.!? id
 
 lookupVarE ::
-     Variable -> ConcreteTypingMonad (Either GlobalStatus (LocalVariable, Int))
+     Monad m
+  => Variable
+  -> ConcreteTypingMonadT m (Either GlobalStatus (LocalVariable, Int))
 lookupVarE var = do
   state <- get
   let result = Typing.lookupVar state var
@@ -217,7 +177,13 @@ lookupVarE var = do
     Right Nothing -> throwError $ UnknownVariable var
     Right (Just lv) -> return $ Right lv
 
-addLV :: Bool -> String -> Type -> Maybe Value -> ConcreteTypingMonad ()
+addLV ::
+     Monad m
+  => Bool
+  -> String
+  -> Type
+  -> Maybe Value
+  -> ConcreteTypingMonadT m ()
 addLV linear name typ mval =
   ts_local %=
   V.cons
@@ -259,7 +225,7 @@ makeGlobalContext (TpState globals locals _) =
     emptyGC :: Interpreter.GlobalContext
     emptyGC = Interpreter.GlobalContext M.empty M.empty
 
-instance TypingMonad ConcreteTypingMonad where
+instance Monad m => TypingMonad (ConcreteTypingMonadT m) where
   register name decl = ts_global %= M.insert name (Registered decl)
   decl name declare = do
     globals <- use ts_global
@@ -389,10 +355,17 @@ instance TypingMonad ConcreteTypingMonad where
     return ()
     where
       addGlobal name tvalue = M.insert name (Defined tvalue)
-  runTyping (CTM ctm) = runExcept $ evalStateT ctm initState
-    where
-      initState :: TypingState
-      initState = TpState M.empty V.empty 0
+
+type ConcreteTypingMonad = ConcreteTypingMonadT Identity
+
+runTypingT :: Monad m => ConcreteTypingMonadT m a -> m (Either Error a)
+runTypingT (CTM action) = runExceptT $ evalStateT action initState
+  where
+    initState :: TypingState
+    initState = TpState M.empty V.empty 0
+
+runTyping :: ConcreteTypingMonad a -> Either Error a
+runTyping = runIdentity . runTypingT
 
 -- Utils
 --   _   _ _   _ _
@@ -662,139 +635,3 @@ typeExprToType e = do
       throwError $
       InternalError
         "interpreter didn't returned a type when given an expression of type Type"
--- checkProgramWellTyped :: Program -> Either TypingError ()
--- checkProgramWellTyped program =
---   runT $ do
---     deftypes <- forM definitions pretypeDefinition
---     let deftyped = zip definitions deftypes
---     forM_ deftyped $ uncurry typeDefinition
---   where
---     runT :: ConcreteTypingMonad () -> Either TypingError ()
---     runT = runTyping
---     definitions :: [Definition]
---     definitions = fmap snd $ M.toList $ program ^. prog_defs
--- checkExprWellTyped :: Expr -> Either TypingError Type
--- checkExprWellTyped = runT . typeExpr
---   where
---     runT :: ConcreteTypingMonad Type -> Either TypingError Type
---     runT = runTyping
--- pretypeDefinition :: TypingMonad m => Definition -> m ([Type], Type)
--- pretypeDefinition (Definition name args typ _) = do
---   args_checked <- mapM processArg args
---   checked <- processType typ
---   replicateM_ (length args) leaveScope
---   let ftype = foldr buildFunType checked args_checked
---   addGlobal name ftype
---   return (fmap snd args_checked, checked)
---   where
---     processArg :: TypingMonad m => (DebugInfo String, Arg) -> m (Bool, Type)
---     processArg (DI name, LinearArg typ) =
---       (processType typ >>=^ addLinear name) >>= return . (True, )
---     processArg (DI name, UnrestrictedArg typ) =
---       (processType typ >>=^ addUnrestricted name) >>= return . (False, )
---     buildFunType :: (Bool, Type) -> Type -> Type
---     buildFunType (True, arg) result = LinArrow arg result
---     buildFunType (False, arg) result = UnrArrow arg result
--- typeDefinition :: TypingMonad m => Definition -> ([Type], Type) -> m ()
--- typeDefinition (Definition name args _ body) (args_type, ret_type) = do
---   forM_ (zip args args_type) addArg
---   checked_type <- typeExpr body
---   when (checked_type /= ret_type) $ throwError $
---     ExpectedType body checked_type ret_type
---   replicateM_ (length args) leaveScope
---   where
---     addArg :: TypingMonad m => ((DebugInfo String, Arg), Type) -> m ()
---     addArg ((DI name, LinearArg _), typ) = addLinear name typ
---     addArg ((DI name, UnrestrictedArg _), typ) = addUnrestricted name typ
--- processType :: TypingMonad m => Expr -> m Type
--- processType (Call (Call (Builtin Plus) e1) e2) =
---   Sum <$> processType e1 <*> processType e2
--- processType (Call (Call (Builtin Product) e1) e2) =
---   Prod <$> processType e1 <*> processType e2
--- processType (Call (Call (Builtin Ampersand) e1) e2) =
---   Choice <$> processType e1 <*> processType e2
--- processType (Call (Call (Builtin LinearArrow) e1) e2) =
---   LinArrow <$> processType e1 <*> processType e2
--- processType (Call (Call (Builtin UnrestrictedArrow) e1) e2) =
---   UnrArrow <$> processType e1 <*> processType e2
--- processType (Const IntType) = return Int
--- processType (Const BoolType) = return Bool
--- processType expr = throwError $ NotAType expr
--- typeExpr :: TypingMonad m => Expr -> m Type
--- typeExpr e@(LocalVar (DI name) id) = typeVariable name e $ DeBruijn id
--- typeExpr e@(Def def) = typeVariable def e $ Global def
--- typeExpr e@(Builtin b) =
---   return $
---   case b of
---     Product -> uarrow
---     Plus -> uarrow
---     Ampersand -> uarrow
---     LinearArrow -> uarrow
---     UnrestrictedArrow -> uarrow
---   where
---     uarrow :: Type
---     uarrow = UnrArrow Universe (UnrArrow Universe Universe)
--- typeExpr e@(Const ct) =
---   return $
---   case ct of
---     IntConst _ -> Int
---     BoolConst _ -> Bool
---     IntType -> Universe
---     BoolType -> Universe
--- typeExpr e@(Assign (DI name) val body) = do
---   vtyp <- typeExpr val
---   addLinear name vtyp
---   rtyp <- typeExpr body
---   leaveScope
---   return rtyp
--- typeExpr e@(IfThenElse cond thenE elseE) = do
---   ctyp <- typeExpr cond
---   when (ctyp /= Bool) $ throwError $ ExpectedType cond ctyp Bool
---   (thenT, thenV) <- saveState $ (,) <$> typeExpr thenE <*> freeVariables
---   (elseT, elseV) <- saveState $ (,) <$> typeExpr elseE <*> freeVariables
---   when (thenV /= elseV) $ throwError $ DifferringRessources thenE elseE
---   when (thenT /= elseT) $ throwError $ ExpectedType elseE thenT elseT
---   return thenT
--- typeExpr e@(Call funE argE) = do
---   funT <- typeExpr funE
---   case funT of
---     LinArrow expectedArgT bodyT -> do
---       argT <- typeExpr argE
---       when (argT /= expectedArgT) $ throwError $
---         ExpectedType argE expectedArgT argT
---       return bodyT
---     UnrArrow expectedArgT bodyT -> do
---       argT <- hideLinear $ typeExpr argE
---       when (argT /= expectedArgT) $ throwError $
---         ExpectedType argE expectedArgT argT
---       return bodyT
--- typeExpr e@(Lambda (DI name) var body) = do
---   argT <-
---     case var of
---       LinearArg typ -> processType typ >>=^ addLinear name
---       UnrestrictedArg typ -> processType typ >>=^ addUnrestricted name
---   bodyT <- typeExpr body
---   leaveScope
---   return $
---     case var of
---       LinearArg _ -> LinArrow argT bodyT
---       UnrestrictedArg _ -> UnrArrow argT bodyT
--- typeExpr Type = return Universe
--- typeVariable :: TypingMonad m => String -> Expr -> Variable -> m Type
--- typeVariable name e var = do
---   state <- variableStatus var
---   case state of
---     LinearUsed -> throwError $ ReusedLinear name e
---     LinearHidden -> throwError $ LinearUseIllegal name e
---     Undefined -> throwError $ UndefinedVariable name e
---     _ -> use var >> varType var
--- -- >>> checkExprWellTyped $ Call (Lambda (DI "x") (LinearArg $ IR.Const BoolType) (IfThenElse (LocalVar (DI "x") 0) (IR.Const (BoolConst False)) (IR.Const (BoolConst True)))) (IR.Const (BoolConst True))
--- -- Right Bool
--- -- >>> checkExprWellTyped $ Call (Lambda (DI "x") (LinearArg $ IR.Const BoolType) (IfThenElse (LocalVar (DI "x") 0) (IR.Const (BoolConst False)) (LocalVar (DI "x") 0))) (IR.Const (BoolConst True))
--- -- Left (ReusedLinear "x" (LocalVar "x" 0))
--- -- >>> checkExprWellTyped $ (Lambda (DI "x") (LinearArg $ IR.Const BoolType) (IfThenElse (LocalVar (DI "x") 0) (IR.Const (BoolConst False)) (IR.Const (BoolConst True))))
--- -- Right (LinArrow Bool Bool)
--- -- >>> checkExprWellTyped $ Call (Lambda (DI "x") (LinearArg $ IR.Const BoolType) (IfThenElse (IR.Const $ BoolConst True) (IR.Const (BoolConst False)) (LocalVar (DI "x") 0))) (IR.Const (BoolConst True))
--- -- Left (DifferringRessources (Const (BoolConst False)) (LocalVar "x" 0))
--- -- >>> checkExprWellTyped $ Call (Lambda (DI "x") (LinearArg $ IR.Const BoolType) (IfThenElse (IR.Const $ BoolConst True) (LocalVar (DI "x") 0) (LocalVar (DI "x") 0))) (IR.Const (BoolConst True))
--- -- Right Bool
