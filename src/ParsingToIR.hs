@@ -131,22 +131,20 @@ indTypToIr ::
      Parser.Expr
   -> [String]
   -> PIRContext
-  -> Either Error ([(String, Bool, IR.Expr)], PIRContext)
-indTypToIr (BinOp BLinearArrow e1 e2) (arg:args) ctx = do
-  e1' <- exprToIr e1 ctx
-  (e2', ctx') <- indTypToIr e2 args ctx
-  return ((arg, True, e1') : e2', ctx')
-indTypToIr (BinOp BLinearArrow _ _) [] ctx = Left $ NotEnoughArgs
+  -> Either Error ([(DebugInfo String, IR.Expr)], PIRContext)
+indTypToIr (BinOp BLinearArrow _ _) _ _ = do
+  Left $ TypeShouldHaveUnrArrows
 indTypToIr (BinOp BUnrestrictedArrow e1 e2) (arg:args) ctx = do
   e1' <- exprToIr e1 ctx
-  (e2', ctx') <- indTypToIr e2 args ctx
-  return ((arg, False, e1') : e2', ctx')
+  let ctx' = addLocalVar "_" ctx
+  (e2', ctx'') <- indTypToIr e2 args ctx'
+  return ((DI arg, e1') : e2', ctx'')
 indTypToIr (BinOp BUnrestrictedArrow _ _) [] ctx = Left $ NotEnoughArgs
 indTypToIr (Forall name e1 e2) (arg:args) ctx = do
   e1' <- exprToIr e1 ctx
   let ctx' = addLocalVar name ctx
   (e2', ctx'') <- indTypToIr e2 args ctx'
-  return ((arg, False, e1') : e2', ctx'')
+  return ((DI arg, e1') : e2', ctx'')
 indTypToIr (Forall _ _ _) [] ctx = Left $ NotEnoughArgs
 indTypToIr e1 (_:_) ctx = Left $ TooManyArgs
 indTypToIr e1 [] ctx = do
@@ -155,16 +153,16 @@ indTypToIr e1 [] ctx = do
     then return ([], ctx)
     else Left $ LastShouldBeType e1'
 
-indToIr :: PInductive -> PIRContext -> Either Error Decl
+indToIr :: PInductive -> PIRContext -> Either Error [Decl]
 indToIr (PInductive name typ args constrs) ctx = do
   (typ', ctx') <- indTypToIr typ args ctx
   constrs' <-
     mapM
       (\(c_name, typ) -> do
          typ' <- exprToIr typ ctx'
-         return (c_name, typ'))
+         return $ DConstr c_name typ')
       constrs
-  return $ DEnum name typ' constrs'
+  return $ DEnum name typ' (fmap (\(DConstr name _) -> name) constrs') : constrs'
 
 structToIr :: PStruct -> PIRContext -> Either Error Decl
 structToIr (PStruct name fields) ctx = do
@@ -176,14 +174,16 @@ structToIr (PStruct name fields) ctx = do
       fields
   return $ DStruct name fields'
 
-declToIr :: PDeclaration -> PIRContext -> Either Error Decl
-declToIr (DefDecl d) ctx = defToIr d ctx
+declToIr :: PDeclaration -> PIRContext -> Either Error [Decl]
+declToIr (DefDecl d) ctx = (: []) <$> defToIr d ctx
 declToIr (IndDecl d) ctx = indToIr d ctx
-declToIr (StructDecl s) ctx = structToIr s ctx
+declToIr (StructDecl s) ctx = (: []) <$> structToIr s ctx
 
 -- Parse a parsed program to an IR program
 parsedProgramToIr :: Parser.Program -> Either Error IR.Program
-parsedProgramToIr =
-  foldM
-    (\p' decl -> flip insertDeclaration p' <$> declToIr decl emptyCtx)
-    (IR.Program M.empty)
+parsedProgramToIr declarations =
+  decls >>= foldM
+                (\prog d -> return $ insertDeclaration d prog)
+                (IR.Program M.empty)
+ where decls :: Either Error [Decl]
+       decls = mconcat <$> forM declarations (flip declToIr emptyCtx)

@@ -44,7 +44,7 @@ data Type
   | TTuple [Type]
   | TArray Type Int
   | TChoice [Type]
-  | TSum [(String, Type)]
+  | TSum [Value] [String]
   | TStruct [(String, Type)]
   | TLinArrow Type Type
   | TUnrArrow Type Type
@@ -55,7 +55,7 @@ data Type
   deriving (Show, Eq, Ord)
 
 void :: Type
-void = TSum []
+void = TSum [] []
 
 unit :: Type
 unit = TTuple []
@@ -90,12 +90,12 @@ data Value
   | VStruct [(String, Value)]
   | VTuple [Value]
   | VArray [Value]
-  | VConstr String Value
   | VOperator [Value] Int Operator
+  | VEnum String [Value] [Value]
   | VFun [Value] Int TExpr
   -- ^ The argument is at De Bruijn index 0 and the context in the list is above 0.
   --   The integer is the number of expected arguments before reduction is possible
-  | VForall [TValue] Type Expr
+  | VForall [TValue] Int Type Expr
   -- ^ Function whose body type depends on the argument.
   deriving (Show, Eq, Ord)
 
@@ -108,6 +108,7 @@ data ExprT typ expr
   = LocalVar (DebugInfo String) Int
   | Def String
   -- ^ Unresolved Definition.
+  | Constructor String
   | Value TValue
   | Let
       { name :: DebugInfo String
@@ -159,9 +160,10 @@ data DeclT typ expr
   = DDef (DefT typ expr)
   | DEnum
       { ename :: String
-      , eargs :: [(String, Bool, typ)] -- name, isLinear, type
-      , constructors :: [(String, typ)]
+      , eargs :: [(DebugInfo String, typ)]
+      , constructors :: [String]
       }
+  | DConstr String typ
   | DStruct
       { sname :: String
       , fields :: [(String, typ)]
@@ -172,6 +174,7 @@ declName :: DeclT typ expr -> String
 declName (DDef DefT {def_name}) = def_name
 declName DEnum {ename} = ename
 declName DStruct {sname} = sname
+declName (DConstr name _) = name
 
 type Decl = DeclT Expr Expr
 

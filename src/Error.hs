@@ -11,6 +11,7 @@ data Error
   | UndefinedVariable String Expr -- Same
   | UndefinedVariableInterpreter Variable
   | NotAType Expr -- Expression is not a type
+  | ValueNotAType Value
   | UnknownVariable Variable
   | LastScope
   -- UnknownBuiltin Builtins
@@ -31,4 +32,5 @@ data Error
   | TooManyArgs
   | ArrayNotSameType Type Type
   | IndexingError String
+  | TypeShouldHaveUnrArrows
   deriving (Eq, Show)
