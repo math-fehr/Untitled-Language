@@ -59,6 +59,7 @@ data Expr
   | IfThenElse Expr Expr Expr
   | Lambda String Expr Expr
   | Parens Expr
+  | EType
   deriving (Show, Eq)
 
 data PDefinition =
@@ -70,18 +71,12 @@ data PDefinition =
     }
   deriving (Show, Eq)
 
-data PIndConstructor =
-  PIndConstructor
-    { pconstr_name :: String
-    , pconstr_type :: Expr
-    }
-  deriving (Show, Eq)
-
 data PInductive =
   PInductive
     { pind_name :: String
-    , pind_args :: [(String, Expr)]
-    , pind_constrs :: [PIndConstructor]
+    , pind_type :: Expr
+    , pind_args :: [String]
+    , pind_constrs :: [(String, Expr)]
     }
   deriving (Show, Eq)
 
@@ -124,6 +119,7 @@ languageDef =
         , "forall"
         , "of"
         , "struct"
+        , "Type"
         ]
     , Token.reservedOpNames =
         [ "+"
@@ -180,7 +176,8 @@ varParser = Var <$> identifier
 expr4Parser :: Parser Expr
 expr4Parser =
   Parens <$> parens exprParser <|> varParser <|>
-  IntConst . fromInteger <$> integer
+  IntConst . fromInteger <$> integer <|>
+  (reserved "Type" >> return EType)
 
 -- | Parse expressions with precedence 3
 expr3Parser :: Parser Expr
@@ -287,6 +284,14 @@ typedVarParser = do
   typ <- exprParser
   return (name, typ)
 
+-- Parse a variable that has a type
+typedVarParser2 :: Parser (String, Expr)
+typedVarParser2 = do
+  name <- identifier
+  reservedOp ":"
+  typ <- expr2Parser
+  return (name, typ)
+
 declParser :: Parser (String, Expr)
 declParser = do
   reserved "decl"
@@ -304,23 +309,19 @@ definitionParser = do
   body <- exprParser
   return $ PDefinition name args body typ
 
-indConstructorParser :: Parser PIndConstructor
-indConstructorParser = do
-  name <- identifier
-  reserved "of"
-  typ <- expr2Parser
-  return $ PIndConstructor name typ
-
 inductiveParser :: Parser PInductive
 inductiveParser = do
   reserved "enum"
   name <- identifier
-  args <- many $ parens typedVarParser
+  reservedOp ":"
+  typ <- exprParser
+  reserved "def"
+  args <- many identifier
   reservedOp ":="
   reservedOp "{"
-  cases <- sepBy indConstructorParser (reservedOp "|")
+  cases <- sepBy1 typedVarParser2 (reservedOp "|")
   reservedOp "}"
-  return $ PInductive name args cases
+  return $ PInductive name typ args cases
 
 structParser :: Parser PStruct
 structParser = do

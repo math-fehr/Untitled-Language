@@ -56,8 +56,13 @@ getExprFromIdent str (PIRContext local) =
 addLocalVar :: String -> PIRContext -> PIRContext
 addLocalVar str = pirctx_local %~ (str :)
 
+ttypeExpr :: IR.Expr
+ttypeExpr =
+  IR.Expr SourcePos $ Value $ TValue (VType (Type True TType)) $ Type True TType
+
 -- Transform a parsed expression to an IR expression
 exprToIr :: Parser.Expr -> PIRContext -> Either Error IR.Expr
+exprToIr EType _ = return ttypeExpr
 exprToIr (Var str) ctx = return $ getExprFromIdent str ctx
 exprToIr (Parser.IntConst i) _ =
   return $
@@ -109,22 +114,44 @@ defToIr (PDefinition name args body typ) ctx = do
   body' <- exprToIr body ctx
   return $ DDef $ DefT name typ' args' body'
 
+indTypToIr ::
+     Parser.Expr
+  -> [String]
+  -> PIRContext
+  -> Either Error ([(String, Bool, IR.Expr)], PIRContext)
+indTypToIr (BinOp BLinearArrow e1 e2) (arg:args) ctx = do
+  e1' <- exprToIr e1 ctx
+  (e2', ctx') <- indTypToIr e2 args ctx
+  return ((arg, True, e1') : e2', ctx')
+indTypToIr (BinOp BLinearArrow _ _) [] ctx = Left $ NotEnoughArgs
+indTypToIr (BinOp BUnrestrictedArrow e1 e2) (arg:args) ctx = do
+  e1' <- exprToIr e1 ctx
+  (e2', ctx') <- indTypToIr e2 args ctx
+  return ((arg, False, e1') : e2', ctx')
+indTypToIr (BinOp BUnrestrictedArrow _ _) [] ctx = Left $ NotEnoughArgs
+indTypToIr (Forall name e1 e2) (arg:args) ctx = do
+  e1' <- exprToIr e1 ctx
+  let ctx' = addLocalVar name ctx
+  (e2', ctx'') <- indTypToIr e2 args ctx'
+  return ((arg, False, e1') : e2', ctx'')
+indTypToIr (Forall _ _ _) [] ctx = Left $ NotEnoughArgs
+indTypToIr e1 (_:_) ctx = Left $ TooManyArgs
+indTypToIr e1 [] ctx = do
+  e1' <- exprToIr e1 ctx
+  if e1' == ttypeExpr
+    then return ([], ctx)
+    else Left $ LastShouldBeType e1'
+
 indToIr :: PInductive -> PIRContext -> Either Error Decl
-indToIr (PInductive name args constrs) ctx = do
-  (ctx', args') <-
-    foldM
-      (\(ctx, args') (argname, arg) -> do
-         arg' <- exprToIr arg ctx
-         return $ (ctx, (argname, arg') : args'))
-      (ctx, [])
-      args
+indToIr (PInductive name typ args constrs) ctx = do
+  (typ', ctx') <- indTypToIr typ args ctx
   constrs' <-
     mapM
-      (\(PIndConstructor c_name typ) -> do
+      (\(c_name, typ) -> do
          typ' <- exprToIr typ ctx'
          return (c_name, typ'))
       constrs
-  return $ DEnum name args' constrs'
+  return $ DEnum name typ' constrs'
 
 structToIr :: PStruct -> PIRContext -> Either Error Decl
 structToIr (PStruct name fields) ctx = do

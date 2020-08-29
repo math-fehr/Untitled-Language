@@ -1,0 +1,2 @@
+enum boolEnum : Type
+def := { TrueEnum : boolEnum | FalseEnum : boolEnum }

@@ -26,4 +26,7 @@ data Error
   | Unimplemented String
   | TypeSystemUnsound String
   | IncompatibleTypes Type Type
+  | LastShouldBeType IR.Expr
+  | NotEnoughArgs
+  | TooManyArgs
   deriving (Eq, Show)
