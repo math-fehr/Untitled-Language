@@ -453,7 +453,10 @@ registerDecl :: TypingMonad m => Decl -> m ()
 registerDecl decl =
   case decl of
     DDef def -> register (def_name def) decl
-    _ -> throwError (InternalError "Enum and struct decl unimplemented")
+    DEnum name _ constructors -> do
+      register name decl
+      forM_ (fst <$> constructors) $ flip register decl
+    _ -> throwError (InternalError "struct register unimplemented")
 
 -- compute the type of the declaration, potentatially by using other decl or defs.
 declDecl :: TypingMonad m => String -> m Type
@@ -461,7 +464,11 @@ declDecl name =
   decl name $ \case
     DDef DefT {def_name, def_type, def_args, def_body} ->
       typeExprToType def_type
-    _ -> throwError (InternalError "Enum and struct decl unimplemented")
+    DEnum e_name e_args e_constructor ->
+      if e_name == name
+        then getTypeFromEnum e_args
+        else throwError (InternalError "constructor decl unimplemented")
+    _ -> throwError (InternalError "struct decl unimplemented")
 
 desugarDef :: TypingMonad m => Type -> [DebugInfo String] -> Expr -> m Expr
 desugarDef typ l body =
@@ -496,6 +503,12 @@ desugarDef typ l body =
              ForAll h (Expr SourcePos $ Value $ TValue (VType arg) TType) body)
         _ -> throwError DeclarationFunctionTypeArgumentNumberMismatch
 
+desugarEnum :: TypingMonad m => String -> [(DebugInfo String, Expr)] -> m Expr
+desugarEnum e_name [] = return $ Expr SourcePos $ Def e_name
+desugarEnum e_name ((h_name, h):t) = do
+  body <- desugarEnum e_name t
+  return $ Expr SourcePos $ ForAll h_name h body
+
 -- compute the value of a declaration
 defDecl :: TypingMonad m => String -> m TValue
 defDecl name =
@@ -505,7 +518,16 @@ defDecl name =
         expr <- desugarDef typ def_args def_body
         texpr <- fst <$> typeExprAndEval expr
         interpret texpr
-      _ -> throwError (InternalError "Enum and struct decl unimplemented")
+      DEnum e_name e_args e_constructors ->
+        if e_name == name
+          then do
+            expr <- desugarEnum e_name e_args
+            --texpr <- typeExpr expr
+            --interpret texpr
+            stat <- globalStatus "boolEnum"
+            throwError (InternalError $ show stat)
+          else throwError (InternalError "Constructor decl unimplemented")
+      _ -> throwError (InternalError "Struct decl unimplemented")
 
 typeVariable :: TypingMonad m => String -> Expr -> Variable -> m Type
 typeVariable name e var = do
@@ -693,3 +715,11 @@ typeExprToType e = do
       throwError $
       InternalError
         "interpreter didn't returned a type when given an expression of type Type"
+
+getTypeFromEnum :: TypingMonad m => [(DebugInfo String, Expr)] -> m Type
+getTypeFromEnum [] = return $ Type True TType
+getTypeFromEnum ((_, e):es) = do
+  e' <- typeExprToType e
+  addUnrestricted "_" e' Nothing
+  es' <- getTypeFromEnum es
+  return $ Type True $ TForallArrow (DI "_") e' es'

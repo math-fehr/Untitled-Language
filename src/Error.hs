@@ -29,4 +29,5 @@ data Error
   | LastShouldBeType IR.Expr
   | NotEnoughArgs
   | TooManyArgs
+  | TypeShouldHaveUnrArrows
   deriving (Eq, Show)
