@@ -13,6 +13,7 @@ import qualified Parser as Pr
 import qualified ParsingToIR as PtIR
 import System.Console.Haskeline
 import System.Console.Repline hiding (Command)
+import System.IO.Error
 import Text.Parsec.Char
 import Text.ParserCombinators.Parsec
 import qualified Typing as Ty
@@ -219,15 +220,29 @@ completer n = filter (L.isPrefixOf n) <$> names
 info :: String -> ReplM ()
 info _ = liftIO $ putStrLn "Unimplemented"
 
+load :: String -> ReplM ()
+load file = do
+  prog <-
+    liftIO $
+    catchIOError
+      (Pr.parseFile file)
+      (\e -> (putStrLn $ "Couldn't read program : " ++ show e) >> return [])
+  case PtIR.parsedProgramToIr prog of
+    Left e -> liftIO $ putStrLn $ "Couldn't parse file : " ++ show e
+    Right program ->
+      case Ty.typeProgram program of
+        Left e -> liftIO $ putStrLn $ "Couldn't type file : " ++ show e
+        Right tprogram -> lift $ Ty.loadTProgram tprogram
+
 opts :: [(String, String -> ReplM ())]
-opts = [("info", info), ("i", info)]
+opts = [("info", info), ("i", info), ("load", load), ("l", load)]
 
 ini :: ReplM ()
 ini = do
   lift $ Ty.loadTProgram prelude
   liftIO $
     putStrLn
-        "Welcome to the Untitled Language Repl !\n\
+      "Welcome to the Untitled Language Repl !\n\
           \        _   _ _     __  __ \n\
           \       | | | | |   |  \\/  |\n\
           \       | | | | |   | |\\/| |\n\
