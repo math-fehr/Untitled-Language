@@ -431,12 +431,8 @@ registerDecl decl =
 declDecl :: TypingMonad m => String -> m Type
 declDecl name =
   decl name $ \case
-    DDef DefT {def_name, def_type, def_args, def_body} -> do
-      texpr <- typeExpr def_type
-      vtype <- interpret texpr
-      case vtype of
-        TValue (VType typ) _ -> return typ
-        _ -> throwError DeclarationTypeIsNotAType
+    DDef DefT {def_name, def_type, def_args, def_body} ->
+      typeExprToType def_type
     _ -> throwError (InternalError "Enum and struct decl unimplemented")
 
 desugarDef :: TypingMonad m => Type -> [DebugInfo String] -> Expr -> m Expr
