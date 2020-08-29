@@ -125,22 +125,20 @@ indTypToIr ::
      Parser.Expr
   -> [String]
   -> PIRContext
-  -> Either Error ([(String, Bool, IR.Expr)], PIRContext)
-indTypToIr (BinOp BLinearArrow e1 e2) (arg:args) ctx = do
-  e1' <- exprToIr e1 ctx
-  (e2', ctx') <- indTypToIr e2 args ctx
-  return ((arg, True, e1') : e2', ctx')
-indTypToIr (BinOp BLinearArrow _ _) [] ctx = Left $ NotEnoughArgs
+  -> Either Error ([(DebugInfo String, IR.Expr)], PIRContext)
+indTypToIr (BinOp BLinearArrow _ _) _ _ = do
+  Left $ TypeShouldHaveUnrArrows
 indTypToIr (BinOp BUnrestrictedArrow e1 e2) (arg:args) ctx = do
   e1' <- exprToIr e1 ctx
-  (e2', ctx') <- indTypToIr e2 args ctx
-  return ((arg, False, e1') : e2', ctx')
+  let ctx' = addLocalVar "_" ctx
+  (e2', ctx'') <- indTypToIr e2 args ctx'
+  return ((DI arg, e1') : e2', ctx'')
 indTypToIr (BinOp BUnrestrictedArrow _ _) [] ctx = Left $ NotEnoughArgs
 indTypToIr (Forall name e1 e2) (arg:args) ctx = do
   e1' <- exprToIr e1 ctx
   let ctx' = addLocalVar name ctx
   (e2', ctx'') <- indTypToIr e2 args ctx'
-  return ((arg, False, e1') : e2', ctx'')
+  return ((DI arg, e1') : e2', ctx'')
 indTypToIr (Forall _ _ _) [] ctx = Left $ NotEnoughArgs
 indTypToIr e1 (_:_) ctx = Left $ TooManyArgs
 indTypToIr e1 [] ctx = do

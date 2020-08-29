@@ -45,6 +45,7 @@ data Type
   | TArray Type Int
   | TChoice [Type]
   | TSum [(String, Type)]
+  | TEnum String [Value]
   | TStruct [(String, Type)]
   | TLinArrow Type Type
   | TUnrArrow Type Type
@@ -87,7 +88,7 @@ data Value
   | VType Type
   | VStruct [(String, Value)]
   | VTuple [Value]
-  | VConstr String Value
+  | VConstr Int [Value] Value
   | VFun [Value] Int TExpr
   -- ^ The argument is at De Bruijn index 0 and the context in the list is above 0.
   --   The integer is the number of expected arguments before reduction is possible
@@ -155,7 +156,7 @@ data DeclT typ expr
   = DDef (DefT typ expr)
   | DEnum
       { ename :: String
-      , eargs :: [(String, Bool, typ)] -- name, isLinear, type
+      , eargs :: [(DebugInfo String, typ)]
       , constructors :: [(String, typ)]
       }
   | DStruct
