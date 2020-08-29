@@ -110,14 +110,21 @@ defToIr (PDefinition name args body typ) ctx = do
   return $ DDef $ DefT name typ' args' body'
 
 indToIr :: PInductive -> PIRContext -> Either Error Decl
-indToIr (PInductive name constrs) ctx = do
+indToIr (PInductive name args constrs) ctx = do
+  (ctx', args') <-
+    foldM
+      (\(ctx, args') (argname, arg) -> do
+         arg' <- exprToIr arg ctx
+         return $ (ctx, (argname, arg') : args'))
+      (ctx, [])
+      args
   constrs' <-
     mapM
       (\(PIndConstructor c_name typ) -> do
-         typ' <- exprToIr typ ctx
+         typ' <- exprToIr typ ctx'
          return (c_name, typ'))
       constrs
-  return $ DEnum name constrs'
+  return $ DEnum name args' constrs'
 
 structToIr :: PStruct -> PIRContext -> Either Error Decl
 structToIr (PStruct name fields) ctx = do

@@ -80,6 +80,7 @@ data PIndConstructor =
 data PInductive =
   PInductive
     { pind_name :: String
+    , pind_args :: [(String, Expr)]
     , pind_constrs :: [PIndConstructor]
     }
   deriving (Show, Eq)
@@ -314,11 +315,12 @@ inductiveParser :: Parser PInductive
 inductiveParser = do
   reserved "enum"
   name <- identifier
+  args <- many $ parens typedVarParser
   reservedOp ":="
   reservedOp "{"
   cases <- sepBy indConstructorParser (reservedOp "|")
   reservedOp "}"
-  return $ PInductive name cases
+  return $ PInductive name args cases
 
 structParser :: Parser PStruct
 structParser = do

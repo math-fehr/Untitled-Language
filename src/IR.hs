@@ -156,6 +156,7 @@ data DeclT typ expr
   = DDef (DefT typ expr)
   | DEnum
       { ename :: String
+      , eargs :: [(String, typ)]
       , constructors :: [(String, typ)]
       }
   | DStruct
