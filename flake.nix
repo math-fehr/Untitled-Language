@@ -3,7 +3,7 @@
   description = "Builds the Untitled Language™ compiler";
 
   inputs = {
-    nixpkgs.url = github:NixOS/nixpkgs/nixos-20.03;
+    nixpkgs.url = github:NixOS/nixpkgs/nixos-unstable;
   };
 
   outputs = { self, nixpkgs }:
@@ -11,7 +11,7 @@
       system           = "x86_64-linux";
       pkgs             = nixpkgs.legacyPackages.${system};
       git-ignore       = pkgs.nix-gitignore.gitignoreSourcePure;
-      compiler-set     = pkgs.haskellPackages.override {
+      compiler-set     = pkgs.haskell.packages.ghc8101.override {
         overrides = self: super: {
           untitled-language = super.callCabal2nix "Untitled-Language" (git-ignore [ ./.gitignore ] ./.) {};
         };
@@ -20,7 +20,7 @@
         packages = hpkgs: [ hpkgs.untitled-language ];
         withHoogle = false;
         buildInputs = with compiler-set; [
-          cabal-install hlint hindent
+          cabal-install hlint
         ];
       };
     in {
