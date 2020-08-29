@@ -25,4 +25,5 @@ data Error
   | DivisionByZero
   | Unimplemented String
   | TypeSystemUnsound String
+  | IncompatibleTypes Type Type
   deriving (Eq, Show)

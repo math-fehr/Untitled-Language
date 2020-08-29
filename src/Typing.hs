@@ -1,9 +1,9 @@
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
 
 module Typing where
 
@@ -506,16 +506,30 @@ typeVariable name e var = do
     Undefined -> throwError $ UndefinedVariable name e
     _ -> useVar var >> varType var
 
+expectType :: TypingMonad m => Type -> Expr -> Type -> m ()
+expectType expected_type expr actual_type =
+  case (expected_type, actual_type) of
+    (Type True etyp, Type True atyp) -> when (etyp /= atyp) fail
+    (Type False etyp, Type _ atyp) -> when (etyp /= atyp) fail
+    _ -> fail
+  where
+    fail = throwError $ ExpectedType expr expected_type actual_type
+
+mergeType :: TypingMonad m => Type -> Type -> m Type
+mergeType t@(Type comptime base) t'@(Type comptime' base') = do
+  when (base /= base') $ throwError $ IncompatibleTypes t t'
+  return (Type (comptime && comptime') base)
+
 typeExpr :: TypingMonad m => Expr -> m TExpr
 typeExpr e = do
   te@(TExpr (Type comptime typ) e') <- typeExpr' e
   if comptime
     then do
-      v <- Typing.interpret te
+      v <- interpret te
       return $ TExpr (Type True typ) (Value v)
     else return te
 
-typeExpr' :: TypingMonad m => Expr -> m (TExpr)
+typeExpr' :: TypingMonad m => Expr -> m TExpr
 typeExpr' e@(Expr _ (LocalVar (DI name) id)) =
   TExpr <$> (typeVariable name e $ DeBruijn id) <*>
   (return $ LocalVar (DI name) id)
@@ -524,27 +538,34 @@ typeExpr' e@(Expr _ (Def def)) =
 typeExpr' (Expr _ (Value (TValue val typ))) =
   return $ TExpr typ (Value (TValue val typ))
 typeExpr' (Expr _ (Let (DI name) val valtyp body)) = do
-  teval@(TExpr tval _) <- typeExpr val
-  addLinear name tval Nothing
+  teval@(TExpr tval@(Type comptime _) _) <- typeExpr val
+  typ <-
+    case valtyp of
+      Just valtyp -> do
+        tvaltyp <- typeExprToType valtyp
+        expectType tvaltyp val tval
+      -- when (tvaltyp /= tval) $ throwError $ ExpectedType val tvaltyp tval
+        return tvaltyp
+      _ -> return tval
+  if comptime
+    then do
+      (TValue vval _) <- interpret teval
+      addLinear name tval (Just vval)
+    else addLinear name tval Nothing
   tebody@(TExpr tbody _) <- typeExpr body
-  _ <- leaveScope
-  case valtyp of
-    Just valtyp -> do
-      tvaltyp <- typeExprToType valtyp
-      when (tvaltyp /= tval) $ throwError $ ExpectedType val tvaltyp tval
-      return $ TExpr tbody $ Let (DI name) teval (Just tval) tebody
-    _ -> return $ TExpr tbody $ Let (DI name) teval (Just tval) tebody
+  leaveScope
+  return $ TExpr tbody $ Let (DI name) teval (Just typ) tebody
 typeExpr' (Expr _ (IfThenElse cond thenE elseE)) = do
   tecond@(TExpr ctyp _) <- typeExpr cond
-  when (ctyp /= (Type False TBool)) $ throwError $
-    ExpectedType cond ctyp (Type False TBool)
-  (tethen@(TExpr thenT _), thenV) <-
+  expectType (Type False TBool) cond ctyp
+  (tethen@(TExpr then_type _), then_free_vars) <-
     saveState $ (,) <$> typeExpr thenE <*> freeVariables
-  (teelse@(TExpr elseT _), elseV) <-
+  (teelse@(TExpr else_type _), else_free_vars) <-
     saveState $ (,) <$> typeExpr elseE <*> freeVariables
-  when (thenV /= elseV) $ throwError $ DifferringRessources thenE elseE
-  when (thenT /= elseT) $ throwError $ ExpectedType elseE thenT elseT
-  return $ TExpr thenT $ IfThenElse tecond tethen teelse
+  when (then_free_vars /= else_free_vars) $ throwError $
+    DifferringRessources thenE elseE
+  commontyp <- mergeType then_type else_type
+  return $ TExpr commontyp $ IfThenElse tecond tethen teelse
 typeExpr' (Expr _ (Call (Expr _ (Operator Plus)) arg)) = typeCallOp Plus arg
 typeExpr' (Expr _ (Call (Expr _ (Operator Minus)) arg)) = typeCallOp Minus arg
 typeExpr' (Expr _ (Call (Expr _ (Operator Times)) arg)) = typeCallOp Times arg
@@ -554,13 +575,11 @@ typeExpr' (Expr _ (Call funE argE)) = do
   case tfun of
     TLinArrow expectedArgT (Type ctbody tbody) -> do
       tearg@(TExpr targ _) <- typeExpr argE
-      when (targ /= expectedArgT) $ throwError $
-        ExpectedType argE expectedArgT targ
+      expectType expectedArgT argE targ
       return $ TExpr (Type (ctbody && ctfun) tbody) $ Call tefun tearg
     TUnrArrow expectedArgT (Type ctbody tbody) -> do
       tearg@(TExpr targ _) <- hideLinear $ typeExpr argE
-      when (targ /= expectedArgT) $ throwError $
-        ExpectedType argE expectedArgT targ
+      expectType expectedArgT argE targ
       return $ TExpr (Type (ctbody && ctfun) tbody) $ Call tefun tearg
     _ -> throwError $ NotAnArrow tfun
 typeExpr' (Expr _ (Tuple es)) = do
