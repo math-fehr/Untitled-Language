@@ -16,6 +16,7 @@ import System.Console.Repline hiding (Command)
 import Text.Parsec.Char
 import Text.ParserCombinators.Parsec
 import qualified Typing as Ty
+import ULPrelude (prelude)
 
 type ReplM = HaskelineT (Ty.ConcreteTypingMonadT IO)
 
@@ -222,15 +223,16 @@ opts :: [(String, String -> ReplM ())]
 opts = [("info", info), ("i", info)]
 
 ini :: ReplM ()
-ini =
+ini = do
+  lift $ Ty.loadTProgram prelude
   liftIO $
-  putStrLn
-    "Welcome to the Untitled Language Repl !\n\
-    \        _   _ _     __  __ \n\
-    \       | | | | |   |  \\/  |\n\
-    \       | | | | |   | |\\/| |\n\
-    \       | |_| | |___| |  | |\n\
-    \        \\___/|_____|_|  |_|\n"
+    putStrLn
+        "Welcome to the Untitled Language Repl !\n\
+          \        _   _ _     __  __ \n\
+          \       | | | | |   |  \\/  |\n\
+          \       | | | | |   | |\\/| |\n\
+          \       | |_| | |___| |  | |\n\
+          \        \\___/|_____|_|  |_|\n"
 
 prompt :: MultiLine -> ReplM String
 prompt MultiLine = return "\\-> "
