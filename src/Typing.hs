@@ -90,6 +90,7 @@ class MonadError Error m =>
   freeVariables :: m (Set Variable)
   interpret :: TExpr -> m TValue
   runTyping :: m a -> Either Error a
+  getTProgram :: m TProgram
 
 -- Concrete typing monad
 --    ___                     _
@@ -223,6 +224,13 @@ addLV linear name typ mval =
      False &
      lv_compTime .~
      mval)
+
+makeTProgram :: TypingState -> TProgram
+makeTProgram (TpState globals _ _) = M.foldrWithKey addGlobal M.empty globals
+  where
+    addGlobal :: String -> GlobalStatus -> TProgram -> TProgram
+    addGlobal name (Defined tvalue) g = M.insert name tvalue g
+    addGlobal _ _ gc = gc
 
 makeGlobalContext :: TypingState -> Interpreter.GlobalContext
 makeGlobalContext (TpState globals locals _) =
@@ -373,6 +381,7 @@ instance TypingMonad ConcreteTypingMonad where
     case result of
       Left runErr -> throwError $ runErr
       Right tval -> return tval
+  getTProgram = makeTProgram <$> get
   runTyping (CTM ctm) = runExcept $ evalStateT ctm initState
     where
       initState :: TypingState
@@ -404,11 +413,14 @@ typeProgram :: Program -> Either Error TProgram
 typeProgram (Program decls) =
   runT $ do
     forM_ decls registerDecl
-    state <- get
-    return $ Interpreter.globals $ makeGlobalContext state
+    forM_ names declDecl
+    forM_ names defDecl
+    getTProgram
   where
     runT :: ConcreteTypingMonad a -> Either Error a
     runT = runTyping
+    names :: [String]
+    names = M.keys decls
 
 registerDecl :: TypingMonad m => Decl -> m ()
 registerDecl decl =
