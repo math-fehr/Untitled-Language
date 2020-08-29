@@ -36,7 +36,7 @@ data TypingMonadTest m where
 
 runTest ::
      TypingMonad m
-  => (forall a. m a -> Either TypingError a)
+  => (forall a. m a -> Either Error a)
   -> TypingMonadTest m
   -> TestTree
 runTest runT (TMTestEq name expected action) =
