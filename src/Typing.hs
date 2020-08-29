@@ -10,8 +10,10 @@ module Typing where
 import Control.Lens hiding (Const(..))
 import Control.Lens.Indexed
 import Control.Monad
+import Control.Monad.Catch
 import Control.Monad.Except
 import Control.Monad.HT (nest)
+import Control.Monad.IO.Class
 import Control.Monad.State hiding (get, put, state)
 import Control.Monad.State.Class
 import Data.Foldable
@@ -151,6 +153,22 @@ instance Monad m => MonadState TypingState (ConcreteTypingMonadT m) where
 
 instance MonadTrans ConcreteTypingMonadT where
   lift = CTM . lift . lift
+
+instance MonadIO m => MonadIO (ConcreteTypingMonadT m) where
+  liftIO = lift . liftIO
+
+instance MonadThrow m => MonadThrow (ConcreteTypingMonadT m) where
+  throwM = CTM . throwM
+
+instance MonadCatch m => MonadCatch (ConcreteTypingMonadT m) where
+  catch (CTM x) handler = CTM $ catch x $ unCTM . handler
+
+instance MonadMask m => MonadMask (ConcreteTypingMonadT m) where
+  mask f = CTM $ mask $ \g -> unCTM $ f (CTM . g . unCTM)
+  uninterruptibleMask f =
+    CTM $ uninterruptibleMask $ \g -> unCTM $ f (CTM . g . unCTM)
+  generalBracket (CTM x) release inner =
+    CTM $ generalBracket x (\a -> unCTM . release a) (unCTM . inner)
 
 collapseGStatus :: Maybe GlobalStatus -> GlobalStatus
 collapseGStatus Nothing = Undeclared

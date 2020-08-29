@@ -69,8 +69,7 @@ data InterpreterState =
 
 makeLenses ''InterpreterState
 
-type ConcreteInterpreterMonad_ m a
-   = StateT InterpreterState (ExceptT Error m) a
+type ConcreteInterpreterMonad_ m a = StateT InterpreterState (ExceptT Error m) a
 
 newtype ConcreteInterpreterMonadT m a =
   CIM
@@ -131,8 +130,7 @@ runInterpreterT (GlobalContext globals ids) (CIM action) =
 
 type ConcreteInterpreterMonad a = ConcreteInterpreterMonadT Identity a
 
-runInterpreter ::
-     GlobalContext -> ConcreteInterpreterMonad a -> Either Error a
+runInterpreter :: GlobalContext -> ConcreteInterpreterMonad a -> Either Error a
 runInterpreter gc = runIdentity . runInterpreterT gc
 
 -- Utils
