@@ -11,6 +11,7 @@ data Error
   | UndefinedVariable String Expr -- Same
   | UndefinedVariableInterpreter Variable
   | NotAType Expr -- Expression is not a type
+  | NotEnumType Expr -- Expression is not the enum type
   | UnknownVariable Variable
   | LastScope
   -- UnknownBuiltin Builtins

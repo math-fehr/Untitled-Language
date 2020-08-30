@@ -44,7 +44,7 @@ data Type
   | TTuple [Type]
   | TArray Type Int
   | TChoice [Type]
-  | TSum [(String, Type)]
+  | TSum [(String, [Type])]
   | TEnum String [Value]
   | TStruct [(String, Type)]
   | TLinArrow Type Type
@@ -157,7 +157,7 @@ data DeclT typ expr
   | DEnum
       { ename :: String
       , eargs :: [(DebugInfo String, typ)]
-      , constructors :: [(String, typ)]
+      , constructors :: [(String, [typ])]
       }
   | DStruct
       { sname :: String
@@ -169,6 +169,11 @@ declName :: DeclT typ expr -> String
 declName (DDef DefT {def_name}) = def_name
 declName DEnum {ename} = ename
 declName DStruct {sname} = sname
+
+declNames :: DeclT typ expr -> [String]
+declNames (DDef DefT {def_name}) = [def_name]
+declNames DEnum {ename, constructors} = ename : (fst <$> constructors)
+declNames DStruct {sname, fields} = sname : (fst <$> fields)
 
 type Decl = DeclT Expr Expr
 

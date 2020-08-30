@@ -147,13 +147,23 @@ indTypToIr e1 [] ctx = do
     then return ([], ctx)
     else Left $ LastShouldBeType e1'
 
+arrowExprToIRExprList :: Parser.Expr -> PIRContext -> Either Error [IR.Expr]
+arrowExprToIRExprList (BinOp BLinearArrow e1 e2) ctx = do
+  e1' <- exprToIr e1 ctx
+  e2' <- arrowExprToIRExprList e2 ctx
+  return $ (e1' : e2')
+arrowExprToIRExprList (Var _) _ = return $ []
+arrowExprToIRExprList e ctx = do
+  e' <- exprToIr e ctx
+  Left $ NotEnumType e'
+
 indToIr :: PInductive -> PIRContext -> Either Error Decl
 indToIr (PInductive name typ args constrs) ctx = do
   (typ', ctx') <- indTypToIr typ args ctx
   constrs' <-
     mapM
       (\(c_name, typ) -> do
-         typ' <- exprToIr typ ctx'
+         typ' <- arrowExprToIRExprList typ ctx'
          return (c_name, typ'))
       constrs
   return $ DEnum name typ' constrs'
