@@ -564,6 +564,12 @@ typeExpr' (Expr _ (Call (Expr _ (Operator Plus)) arg)) = typeCallOp Plus arg
 typeExpr' (Expr _ (Call (Expr _ (Operator Minus)) arg)) = typeCallOp Minus arg
 typeExpr' (Expr _ (Call (Expr _ (Operator Times)) arg)) = typeCallOp Times arg
 typeExpr' (Expr _ (Call (Expr _ (Operator Div)) arg)) = typeCallOp Div arg
+typeExpr' (Expr _ (Call (Expr _ (Operator Eq)) arg)) = typeCallOp Eq arg
+typeExpr' (Expr _ (Call (Expr _ (Operator Neq)) arg)) = typeCallOp Neq arg
+typeExpr' (Expr _ (Call (Expr _ (Operator Gteq)) arg)) = typeCallOp Gteq arg
+typeExpr' (Expr _ (Call (Expr _ (Operator Gt)) arg)) = typeCallOp Gt arg
+typeExpr' (Expr _ (Call (Expr _ (Operator Lt)) arg)) = typeCallOp Lt arg
+typeExpr' (Expr _ (Call (Expr _ (Operator Lteq)) arg)) = typeCallOp Lteq arg
 typeExpr' (Expr _ (Call funE argE)) = do
   tefun@(TExpr (Type ctfun tfun) _) <- typeExpr funE
   case tfun of
@@ -618,7 +624,7 @@ typeExpr' (Expr _ (Operator LinArrow)) =
       arrowtype = TUnrArrow ttype $ Type True $ (TUnrArrow ttype ttype)
    in return $ TExpr (Type True arrowtype) (Operator LinArrow)
 typeExpr' (Expr _ (Operator op)) =
-  throwError (InternalError $ "Operator" ++ show op ++ "implemented")
+  throwError (InternalError $ "Operator" ++ show op ++ "unimplemented")
 
 typeCallOp :: TypingMonad m => Operator -> Expr -> m TExpr
 typeCallOp op arg = do
@@ -630,7 +636,19 @@ typeCallOp op arg = do
           TInt intType ->
             let funType = binopType True (TInt intType)
              in return $ TExpr (typeAfterCall ctarg funType) $
-                Call (TExpr funType (Operator Plus)) tearg
+                Call (TExpr funType (Operator op)) tearg
+          _ -> throwError (ExpectedIntType arg targ)
+    _
+      | op == Eq || op == Neq  ->
+        return $ TExpr typafter $ Call (TExpr funType (Operator op)) tearg
+      where funType = compType tbarg
+            typafter = typeAfterCall ctarg funType
+    _ | op == Gt || op == Lt || op == Gteq || op == Lteq ->
+        case tbarg of
+          TInt intType ->
+            let funType = compType (TInt intType)
+             in return $ TExpr (typeAfterCall ctarg funType) $
+                Call (TExpr funType (Operator op)) tearg
           _ -> throwError (ExpectedIntType arg targ)
 
 binopType :: Bool -> TypeBase -> Type
@@ -640,6 +658,14 @@ binopType comptime typ =
     (TLinArrow
        (Type False typ)
        (Type True $ TLinArrow (Type False typ) (Type False typ)))
+
+compType :: TypeBase -> Type
+compType typ =
+  Type
+    True
+    (TLinArrow
+       (Type False typ)
+       (Type True $ TLinArrow (Type False typ) (Type False TBool)))
 
 typeAfterCall :: Bool -> Type -> Type
 typeAfterCall comptime (Type comptimeFun (TLinArrow arg (Type _ body))) =

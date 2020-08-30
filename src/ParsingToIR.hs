@@ -38,6 +38,12 @@ binOpBuiltins =
     , (BDiv, IR.Div)
     , (BUnrestrictedArrow, IR.Arrow)
     , (BLinearArrow, IR.LinArrow)
+    , (BEq, IR.Eq)
+    , (BNeq, IR.Neq)
+    , (BGt, IR.Gt)
+    , (BGteq, IR.Gteq)
+    , (BLt, IR.Lt)
+    , (BLteq, IR.Lteq)
     ]
 
 -- Manyary operations

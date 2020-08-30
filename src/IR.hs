@@ -77,6 +77,12 @@ data Operator
   | Bar
   | Arrow
   | LinArrow
+  | Eq
+  | Neq
+  | Gt
+  | Lt
+  | Gteq
+  | Lteq
   deriving (Show, Eq, Ord)
 
 -- | Type for concrete comptime values in the interpreter

@@ -18,6 +18,12 @@ data BinOp
   | BDiv
   | BUnrestrictedArrow
   | BLinearArrow
+  | BEq
+  | BNeq
+  | BLt
+  | BLteq
+  | BGt
+  | BGteq
   deriving (Ord, Show, Eq)
 
 str2binOp :: String -> BinOp
@@ -27,6 +33,12 @@ str2binOp "*" = BTimes
 str2binOp "/" = BDiv
 str2binOp "->" = BUnrestrictedArrow
 str2binOp "-@" = BLinearArrow
+str2binOp "==" = BEq
+str2binOp "!=" = BNeq
+str2binOp ">" = BGt
+str2binOp ">=" = BGteq
+str2binOp "<" = BLt
+str2binOp "<=" = BLteq
 
 data ManyOp
   = MAmpersand
@@ -130,6 +142,10 @@ languageDef =
         , "&"
         , "<"
         , ">"
+        , "="
+        , ">="
+        , "<="
+        , "!="
         , "->"
         , "|"
         , "=>"
@@ -195,7 +211,7 @@ builtinManyOp op = do
      in case x of
           ManyOp mop es
             | mop == currentmo -> ManyOp currentmo (es ++ [y])
-          _ -> ManyOp currentmo ([x, y])
+          _ -> ManyOp currentmo [x, y]
 
 forallParser :: Parser (Expr -> Expr)
 forallParser = do
@@ -213,6 +229,13 @@ operatorsList =
   , [Infix (builtinManyOp "^") AssocLeft]
   , [Infix (builtinManyOp "|") AssocLeft]
   , [Infix (builtinManyOp ",") AssocLeft]
+  , [ Infix (builtinBinOp "==") AssocNone
+    , Infix (builtinBinOp "!=") AssocNone
+    , Infix (builtinBinOp "<=") AssocNone
+    , Infix (builtinBinOp "<") AssocNone
+    , Infix (builtinBinOp ">=") AssocNone
+    , Infix (builtinBinOp ">") AssocNone
+    ]
   ]
 
 -- | Parse expressions with precedence 1

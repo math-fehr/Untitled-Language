@@ -29,18 +29,18 @@ import Error
 import IR
 
 -- MonadError
---   __  __                       _ _____                     
---  |  \/  | ___  _ __   __ _  __| | ____|_ __ _ __ ___  _ __ 
+--   __  __                       _ _____
+--  |  \/  | ___  _ __   __ _  __| | ____|_ __ _ __ ___  _ __
 --  | |\/| |/ _ \| '_ \ / _` |/ _` |  _| | '__| '__/ _ \| '__|
---  | |  | | (_) | | | | (_| | (_| | |___| |  | | | (_) | |   
---  |_|  |_|\___/|_| |_|\__,_|\__,_|_____|_|  |_|  \___/|_|   
---                                                            
+--  | |  | | (_) | | | | (_| | (_| | |___| |  | | | (_) | |
+--  |_|  |_|\___/|_| |_|\__,_|\__,_|_____|_|  |_|  \___/|_|
+--
 -- Abstract
---     _   _       _               _   
---    /_\ | |__ __| |_ _ _ __ _ __| |_ 
+--     _   _       _               _
+--    /_\ | |__ __| |_ _ _ __ _ __| |_
 --   / _ \| '_ (_-<  _| '_/ _` / _|  _|
 --  /_/ \_\_.__/__/\__|_| \__,_\__|\__|
---                                     
+--
 data GlobalContext =
   GlobalContext
     { globals :: Map String TValue
@@ -55,11 +55,11 @@ class MonadError Error m =>
   withValue :: Value -> m b -> m b
 
 -- Concrete
---    ___                     _       
---   / __|___ _ _  __ _ _ ___| |_ ___ 
+--    ___                     _
+--   / __|___ _ _  __ _ _ ___| |_ ___
 --  | (__/ _ \ ' \/ _| '_/ -_)  _/ -_)
 --   \___\___/_||_\__|_| \___|\__\___|
---                                    
+--
 data InterpreterState =
   ItState
     { _is_global :: Map String Value
@@ -134,12 +134,12 @@ runInterpreter :: GlobalContext -> ConcreteInterpreterMonad a -> Either Error a
 runInterpreter gc = runIdentity . runInterpreterT gc
 
 -- Utils
---   _   _ _   _ _     
---  | | | | |_(_) |___ 
+--   _   _ _   _ _
+--  | | | | |_(_) |___
 --  | | | | __| | / __|
 --  | |_| | |_| | \__ \
 --   \___/ \__|_|_|___/
---                     
+--
 liftMaybe :: MonadError e m => e -> Maybe a -> m a
 liftMaybe error = maybe (throwError error) return
 
@@ -157,12 +157,12 @@ type ICMonad m = StateT InspectCapturedState m
 
 makeLenses ''InspectCapturedState
 
---   ___       _                           _            
---  |_ _|_ __ | |_ ___ _ __ _ __  _ __ ___| |_ ___ _ __ 
+--   ___       _                           _
+--  |_ _|_ __ | |_ ___ _ __ _ __  _ __ ___| |_ ___ _ __
 --   | || '_ \| __/ _ \ '__| '_ \| '__/ _ \ __/ _ \ '__|
---   | || | | | ||  __/ |  | |_) | | |  __/ ||  __/ |   
---  |___|_| |_|\__\___|_|  | .__/|_|  \___|\__\___|_|   
---                         |_|                          
+--   | || | | | ||  __/ |  | |_) | | |  __/ ||  __/ |
+--  |___|_| |_|\__\___|_|  | .__/|_|  \___|\__\___|_|
+--                         |_|
 interpret :: GlobalContext -> TExpr -> Either Error TValue
 interpret gc expr@(TExpr typ _) =
   flip TValue typ <$> (rinter $ interpretTExpr expr)
@@ -220,6 +220,12 @@ makeOperatorClosure tp Plus = binOp tp Plus
 makeOperatorClosure tp Minus = binOp tp Minus
 makeOperatorClosure tp Times = binOp tp Times
 makeOperatorClosure tp Div = binOp tp Div
+makeOperatorClosure tp Eq = binOp tp Eq
+makeOperatorClosure tp Neq = binOp tp Neq
+makeOperatorClosure tp Lteq = binOp tp Lteq
+makeOperatorClosure tp Lt = binOp tp Lt
+makeOperatorClosure tp Gt = binOp tp Gt
+makeOperatorClosure tp Gteq = binOp tp Gteq
 makeOperatorClosure tp Hat = unOp tp Hat
 makeOperatorClosure tp Ampersand = unOp tp Ampersand
 makeOperatorClosure tp Bar = unOp tp Bar
@@ -245,6 +251,22 @@ evaluateOperator Times _ =
 evaluateOperator Div [VInt i1, VInt i2] = return $ VInt $ (i1 `div` i2)
 evaluateOperator Div _ =
   throwError $ TypeSystemUnsound "Invalid \"/\" arguments"
+evaluateOperator Eq [v, v'] = return $ VBool (v == v')
+evaluateOperator Eq _ =
+  throwError $ TypeSystemUnsound "Invalid \"==\" arguments"
+evaluateOperator Neq [v, v'] = return $ VBool (v /= v')
+evaluateOperator Neq _ =
+  throwError $ TypeSystemUnsound "Invalid \"!=\" arguments"
+evaluateOperator Gt [VInt i1, VInt i2] = return $ VBool (i1 > i2)
+evaluateOperator Gt _ = throwError $ TypeSystemUnsound "Invalid \">\" arguments"
+evaluateOperator Lt [VInt i1, VInt i2] = return $ VBool (i1 < i2)
+evaluateOperator Lt _ = throwError $ TypeSystemUnsound "Invalid \"<\" arguments"
+evaluateOperator Gteq [VInt i1, VInt i2] = return $ VBool (i1 >= i2)
+evaluateOperator Gteq _ =
+  throwError $ TypeSystemUnsound "Invalid \">=\" arguments"
+evaluateOperator Lteq [VInt i1, VInt i2] = return $ VBool (i1 <= i2)
+evaluateOperator Lteq _ =
+  throwError $ TypeSystemUnsound "Invalid \"<=\" arguments"
 evaluateOperator Hat [VTuple (VInt start:args)] =
   VInt <$> foldM (\acc v -> xor acc <$> extractVInt "\"^\"" v) start args
 evaluateOperator Hat [VTuple (VType start:args)] =
@@ -266,12 +288,12 @@ evaluateOperator Arrow _ =
 evaluateOperator LinArrow [VType t1, VType t2@(Type comptime _)] =
   return $ VType $ Type comptime $ TLinArrow t1 t2
 evaluateOperator LinArrow _ =
-  throwError $ TypeSystemUnsound "Invalid \"-o\" arguments"
+  throwError $ TypeSystemUnsound "Invalid \"-@\" arguments"
 
 extractVInt :: InterpreterMonad m => String -> Value -> m Integer
 extractVInt _ (VInt i) = return i
 extractVInt opname _ =
-  throwError $ TypeSystemUnsound $ opname <> " extected an integer"
+  throwError $ TypeSystemUnsound $ opname <> " eted an integer"
 
 extractVType :: InterpreterMonad m => String -> Value -> m Type
 extractVType _ (VType t) = return t
