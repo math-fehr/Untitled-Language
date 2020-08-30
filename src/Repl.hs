@@ -45,10 +45,10 @@ cmdParser :: Parser Command
 cmdParser =
   (either (CmdError . CvtError) CmdTopLevel <$>
    flip PtIR.declToIr (PtIR.PIRContext []) <$>
-   Pr.declarationParser) <|>
+   (Pr.declarationParser <* eof)) <|>
   (either (CmdError . CvtError) CmdExpr <$>
    flip PtIR.exprToIr (PtIR.PIRContext []) <$>
-   Pr.exprParser)
+   (Pr.exprParser <* eof))
 
 getCommand :: String -> Command
 getCommand str =

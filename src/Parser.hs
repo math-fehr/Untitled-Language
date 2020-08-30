@@ -140,6 +140,8 @@ languageDef =
         , "}"
         , ";"
         ]
+    , Token.opStart = oneOf "+-*/:&<>=^,{};"
+    , Token.opLetter = oneOf "+-*/:&<>=^,{};@"
     }
 
 lexer = Token.makeTokenParser languageDef
@@ -164,38 +166,36 @@ varParser = Var <$> identifier
 
 {- * Expression parser
    The precedence are:
-   - 4: atomic elements and parenthesised expressions
-   - 3: Arithmetic and related binary operations ( + - * / )
-   - 2: Many arity operation (^ & | ,)
-   - 1: Low precedence binary operators ( -> -@ = > <)
-   - 0: Function call
+   - 2: atomic elements and parenthesised expressions
+   - 2: Function calls
+   - 1: Operators
+   - 0: Top level bindings
 
    TODO: Handle precedence below function call
 -}
--- | Parse expressions with precedence 4
-expr4Parser :: Parser Expr
-expr4Parser =
+-- | Parse expressions with precedence 3
+expr3Parser :: Parser Expr
+expr3Parser =
   Parens <$> parens exprParser <|> varParser <|>
   IntConst . fromInteger <$> integer <|>
   (reserved "Type" >> return EType)
 
--- | Parse expressions with precedence 3
-expr3Parser :: Parser Expr
-expr3Parser = opParser3 <|> expr4Parser
+-- | Parse expressions with precedence 2
+expr2Parser :: Parser Expr
+expr2Parser = (try callParser) <|> expr3Parser
 
 builtinBinOp :: String -> Parser (Expr -> Expr -> Expr)
 builtinBinOp op = reservedOp op >> return (BinOp $ str2binOp op)
 
 builtinManyOp :: String -> Parser (Expr -> Expr -> Expr)
-builtinManyOp op =
-  reservedOp op >>
-  return
-    (\x y ->
-       let currentmo = str2manyOp op
-        in case x of
-             ManyOp mop es
-               | mop == currentmo -> ManyOp currentmo (es ++ [y])
-             _ -> ManyOp currentmo ([x, y]))
+builtinManyOp op = do
+  reservedOp op
+  return $ \x y ->
+    let currentmo = str2manyOp op
+     in case x of
+          ManyOp mop es
+            | mop == currentmo -> ManyOp currentmo (es ++ [y])
+          _ -> ManyOp currentmo ([x, y])
 
 forallParser :: Parser (Expr -> Expr)
 forallParser = do
@@ -204,40 +204,24 @@ forallParser = do
   reservedOp "->"
   return $ Forall name typ
 
-operatorsList3 =
+operatorsList =
   [ [Infix (builtinBinOp "*") AssocLeft, Infix (builtinBinOp "/") AssocLeft]
   , [Infix (builtinBinOp "+") AssocLeft, Infix (builtinBinOp "-") AssocLeft]
   , [Prefix forallParser]
   , [Infix (builtinBinOp "->") AssocRight, Infix (builtinBinOp "-@") AssocRight]
+  , [Infix (builtinManyOp "&") AssocLeft]
+  , [Infix (builtinManyOp "^") AssocLeft]
+  , [Infix (builtinManyOp "|") AssocLeft]
+  , [Infix (builtinManyOp ",") AssocLeft]
   ]
-
-opParser3 :: Parser Expr
-opParser3 = buildExpressionParser operatorsList3 expr4Parser
-
-operatorsListMany2 =
-  [[Infix (builtinManyOp "&") AssocLeft], [Infix (builtinManyOp "^") AssocLeft]]
-
-manyOpParser1 :: Parser Expr
-manyOpParser1 = buildExpressionParser operatorsListMany1 expr3Parser
-
-operatorsListMany1 =
-  [[Infix (builtinManyOp "|") AssocLeft], [Infix (builtinManyOp ",") AssocLeft]]
-
-manyOpParser2 :: Parser Expr
-manyOpParser2 = buildExpressionParser operatorsListMany2 expr3Parser
-
--- | Parse expressions with precedence 2
-expr2Parser :: Parser Expr
-expr2Parser = manyOpParser2 <|> expr3Parser
 
 -- | Parse expressions with precedence 1
 expr1Parser :: Parser Expr
-expr1Parser = manyOpParser1 <|> expr2Parser
+expr1Parser = buildExpressionParser operatorsList expr2Parser
 
 -- | Parse expressions with precedence 0
 exprParser :: Parser Expr
-exprParser =
-  callParser <|> letParser <|> ifParser <|> lambdaParser <|> expr1Parser
+exprParser = letParser <|> ifParser <|> lambdaParser <|> expr1Parser
 
 -- | Parse let bindings
 letParser :: Parser Expr
@@ -264,7 +248,7 @@ exprListToCall :: [Expr] -> Expr
 exprListToCall = foldl1 Call
 
 callParser :: Parser Expr
-callParser = exprListToCall <$> sepBy1 expr1Parser (return ())
+callParser = exprListToCall <$> sepBy1 expr3Parser (return ())
 
 ifParser :: Parser Expr
 ifParser = do
@@ -347,7 +331,7 @@ programParser = do
 
 parseExprFromString :: String -> IO Expr
 parseExprFromString str =
-  case parse exprParser "" str of
+  case parse (exprParser <* eof) "" str of
     Left e -> print e >> fail "parse error"
     Right r -> return r
 
