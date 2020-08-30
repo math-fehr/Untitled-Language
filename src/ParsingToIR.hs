@@ -84,6 +84,9 @@ exprToIr (BinOp binop e1 e2) ctx = do
   return $
     Expr SourcePos $
     IR.Call (Expr SourcePos $ IR.Call (Expr SourcePos $ Operator op) e1') e2'
+exprToIr (ManyOp MComma es) ctx =
+  Expr SourcePos <$> Tuple <$>
+  foldM (\lst e -> (: lst) <$> exprToIr e ctx) [] es
 exprToIr (ManyOp mop es) ctx = do
   let op = manyOpBuiltins ! mop
   es' <- mapM (flip exprToIr ctx) es
