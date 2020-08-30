@@ -41,6 +41,7 @@ executable Untitled-Language
                      , exceptions >= 0.10 && < 0.11
   hs-source-dirs:      src
   default-language:    Haskell2010
+  ld-options: -static
 
 test-suite Tasty
   main-is:             Tests.hs
