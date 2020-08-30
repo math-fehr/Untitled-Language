@@ -218,7 +218,9 @@ completer :: WordCompleter (Ty.ConcreteTypingMonadT IO)
 completer n = filter (L.isPrefixOf n) <$> names
 
 info :: String -> ReplM ()
-info _ = liftIO $ putStrLn "Unimplemented"
+info name = do
+  status <- lift $ Ty.globalStatus name
+  liftIO $ putStrLn $ name ++ ": " ++ show status
 
 load :: String -> ReplM ()
 load file = do
