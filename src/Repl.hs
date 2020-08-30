@@ -1,5 +1,3 @@
-module Repl where
-
 import Control.Lens
 import Control.Monad.Except
 import Control.Monad.State
@@ -263,8 +261,8 @@ leaving = do
   liftIO $ putStrLn "Good bye world!"
   return Exit
 
-repl :: IO ()
-repl =
+main :: IO ()
+main =
   discard $
   Ty.runTypingT $
   evalRepl prompt cmd opts (Just ':') Nothing (Word0 completer) ini leaving
