@@ -18,10 +18,10 @@ boolt :: Type
 boolt = comptimetyp TBool
 
 bool :: TValue
-bool = typ2val boolt
+bool = typ2val $ Type False TBool
 
 int :: TValue
-int = typ2val $ comptimetyp $ TInt $ IntType 32 True False
+int = typ2val $ Type False $ TInt $ IntType 32 True False
 
 true :: TValue
 true = TValue (VBool True) boolt

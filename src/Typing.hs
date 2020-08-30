@@ -556,8 +556,10 @@ typeExpr' (Expr _ (IfThenElse cond thenE elseE)) = do
     saveState $ (,) <$> typeExpr elseE <*> freeVariables
   when (then_free_vars /= else_free_vars) $ throwError $
     DifferringRessources thenE elseE
-  commontyp <- mergeType then_type else_type
-  return $ TExpr commontyp $ IfThenElse tecond tethen teelse
+  Type common_comptime common_type <- mergeType then_type else_type
+  let Type cond_comptime _ = ctyp
+  let restyp = Type (common_comptime && cond_comptime) common_type
+  return $ TExpr restyp $ IfThenElse tecond tethen teelse
 typeExpr' (Expr _ (Call (Expr _ (Operator Plus)) arg)) = typeCallOp Plus arg
 typeExpr' (Expr _ (Call (Expr _ (Operator Minus)) arg)) = typeCallOp Minus arg
 typeExpr' (Expr _ (Call (Expr _ (Operator Times)) arg)) = typeCallOp Times arg
