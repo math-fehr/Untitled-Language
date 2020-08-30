@@ -7,7 +7,7 @@ data Error
   | ExpectedIntType Expr Type -- Expression, and real type
   | ReusedLinear String Expr -- Variable name, expression,
                              -- and expression in which it's used
-  | UnusedLinear String Expr -- Same
+  | UnusedLinear String
   | UndefinedVariable String Expr -- Same
   | UndefinedVariableInterpreter Variable
   | NotAType Expr -- Expression is not a type

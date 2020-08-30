@@ -80,7 +80,9 @@ class MonadError Error m =>
   -- variable will still be marked as declared.
   addLinear :: String -> Type -> Maybe Value -> m ()
   addUnrestricted :: String -> Type -> Maybe Value -> m ()
-  leaveScope :: m String -- Name of variable which scope we're leaving
+  leaveScope :: m VarStatus
+  -- ^ Throws UnusedLinear if variable is LinearFree, otherwise
+  -- returns status of variable which scope we're leaving.
   variableStatus :: Variable -> m VarStatus
   globalStatus :: String -> m GlobalStatus
   -- State manipulation
@@ -290,10 +292,13 @@ instance Monad m => TypingMonad (ConcreteTypingMonadT m) where
   addLinear = addLV True
   addUnrestricted = addLV False
   leaveScope = do
+    status <- variableStatus $ DeBruijn 0
     locals <- use ts_local
     when (V.null locals) $ throwError LastScope
     ts_local %= V.tail
-    return $ (V.head locals) ^. lv_name
+    let lv = V.head locals
+    when (status == LinearFree) $ throwError $ UnusedLinear (lv ^. lv_name)
+    return status
   variableStatus var = do
     state <- get
     return $
