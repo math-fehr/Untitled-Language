@@ -1,0 +1,9 @@
+enum boolEnum : Type
+def := { TrueEnum : boolEnum | FalseEnum : boolEnum }
+
+decl main : Int
+def :=
+  match TrueEnum with
+  | TrueEnum => 0
+  | FalseEnum => 42
+  end
