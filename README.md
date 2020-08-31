@@ -94,15 +94,156 @@ world. In particular, we'll move to include the linearity inside the types.
 
 ## Monads
 
-Unfortunately. TODO explain the idea and then do cf. Haskell
+Linear types are not sufficient to implement actual side-effect on the external
+world like printing on `stdout` or reading from `stdin`. In order to do that, we
+need an `IO` monad like the one of Haskell and a more general monad theory. This
+had not yet been implemented by lack of time. One thing that the combination of
+a linear type system and monad allow is for example to be able to extract
+`stdout` as a linear ressource type from `IO` and then pass it around as a
+linear value, Using it in function like `print_int : OutStream -@ Int ->
+OutStream` that consume and use it to print the integer, then return the output
+stream after the effect. This allow some limited side-effect power without the
+syntax of monads, while staying a pure language
 
 # Getting Started
 
-TODO Explain how to setup the REPL
+TODO
 
 # Current primitives and syntax
 
-TODO Give example like fibonacci and how to use tuple, arrays, enums, ints, ...
+## Type system remarks
+
+The type system is fully accessible at compile time, all expression that can be
+evaluated at compile time are evaluated then as they are pure and cannot have
+side-effects. Since arbitrary operation can be done on types, Type inference is
+not possible in general. We choose not to do it at all, which means types are
+deduced in a purely forward manner: Later types appearing later in a function
+definition cannot affect in any way the type of previous variable declaration.
+
+## Basic syntax
+
+### Expressions
+
+Expressions are like usual language for arithmetic like `1 + 1` but are also
+available for types like `Int & Int` which the type of a pair of int:
+```
+(2 , 3) : Int & Int
+```
+The `&` operator was chosen because we wanted `*` to remain associative in all cases.
+`&` is not an associative operator `a & b & c` is not `(a & b) & c` neither `a & (b & c)`.
+This is necessary to implement fundamentally not associative operation like constructing
+a tuple types. Such operators are called many-arity operators.
+
+Function are called in the functional style like `function argument` and are generally
+curried.
+
+### Primitive types
+
+Constant integer are of type `Int` which is temporarily an unbounded integer.
+There is also a type `Bool` with values `True` and `False`.
+
+### Arrays
+
+Fixed-size array are (for now) a primitive type. They are currently our only example
+of dependent types but in the future any type could be dependent.
+
+The construction syntax is:
+```
+{1 ; 2 ; 3} : Array Int 3
+```
+
+Here `Array` is a function of type `Type -> Int -> Type`.
+
+Array can be indexed with `array[index]` like usual. This is only a getter as the
+language is pure.
+
+### Tuples
+
+Tuples is group of values of arbitrary types. A tuple is constructed with the
+comma operator `,` and the type of a tuple is constructed with `&` on types. For
+example:
+
+```
+1 , False, {5 ; 6}, (True, 42) : Int & Bool & Array Int 2 & (Bool & Int)
+```
+
+Tuple can be indexed with `tuple[index]` with the condition that the `index` is
+a compile time constant, otherwise the type of the expression could not be
+deduced.
+
+### Control-flow
+
+The syntax of the `if` is the usual one of functional programming language :
+```
+if condition then expr1 else expr2
+```
+
+Unfortunately there is no generic match construction for now. The match
+construct can only be used to deconstruct enums
+
+### Function declaration
+
+Since the type system is purely forward, a function must declare explicitly the type of all
+it's arguments. The syntax is
+
+```
+decl func : Type1 -> Type2
+def arg := body
+```
+
+However a function could use another function in it's type definition like
+
+```
+decl func : compute_type_of_func arg1 arg2
+def arg := body
+```
+
+During the typing of `func`, `compute_type_of_func` is fully evaluated and the
+result must be of type `Type`, this value of type is then used as the type of
+`func`. In fact, in the previous declaration, `Type1 -> Type2` was a normal
+expression that used the operator `->` on `Type1` and `Type2`. The operator `->`
+and `-@` have types `Type -> Type -> Type`.
+
+### Let binding
+
+To introduce new variables, one can do
+
+```
+let var := expr in body
+```
+
+This will evaluate `expr`, bind it to `var` and then evaluate `body` using
+`var`. There is also a typed version that looks like this:
+
+```
+let var : typeexpr := expr in body
+```
+
+In this one, `typeexpr` is evaluate at compile time, and it's value which must
+be of type `Type` is checked against the type of `expr`.
+
+### Lambda function
+
+The syntax for lambda/anonymous function is:
+
+```
+fun arg => body
+```
+
+### Enumeration
+
+TODO
+
+## Examples
+
+### Fibonacci
+
+```
+decl fib_naive : Int -> Int
+def n = if n == 0 then 1 else fib (n -1) + fib (n -2)
+```
+
+### Merge sort
 
 # Smaller Planned features
 
