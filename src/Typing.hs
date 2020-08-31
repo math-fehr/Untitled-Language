@@ -512,7 +512,7 @@ typeEnum ::
      TypingMonad m
   => [(DebugInfo String, Expr)]
   -> [(String, [Expr])]
-  -> m Value
+  -> m Expr
 typeEnum [] constructors = do
   constructors' <-
     forM
@@ -520,13 +520,13 @@ typeEnum [] constructors = do
       (\(var, typ) -> do
          typ' <- forM typ typeExprToType
          return $ (var, typ'))
-  return $ VType $ TSum constructors'
+  return $ exprOfTValue $ TValue (VType $ TSum constructors') TType
 typeEnum ((DI arg_name, arg_typ):args) constructors = do
   arg_typ' <- typeExprToType arg_typ
   addUnrestricted arg_name arg_typ' Nothing
   typedEnum <- typeEnum args constructors
   _ <- leaveScope
-  return $ (VFun [] 1 $ texprOfTValue (TValue typedEnum TType))
+  return $ exprOfTValue $ TValue (VForall [] arg_typ' typedEnum) TType
 
 -- compute the value of a declaration
 defDecl :: TypingMonad m => String -> m TValue
@@ -541,7 +541,8 @@ defDecl name =
         if e_name == name
           then do
             expr <- typeEnum e_args e_constructors
-            interpret $ texprOfTValue $ TValue expr TType
+            texpr <- fst <$> typeExprAndEval expr
+            interpret texpr
           else throwError (InternalError "Constructor decl unimplemented")
       _ -> throwError (InternalError "Struct decl unimplemented")
 
@@ -769,5 +770,11 @@ getTypeFromConstr' e_name (arg:args) = do
 texprOfTValue :: TValue -> TExpr
 texprOfTValue tv@(TValue _ t) = TExpr t $ Value tv
 
+exprOfTValue :: TValue -> Expr
+exprOfTValue tv@(TValue _ t) = Expr SourcePos $ Value tv
+
 texprOfType :: Type -> TExpr
 texprOfType t = texprOfTValue $ TValue (VType t) TType
+
+exprOfType :: TValue -> Expr
+exprOfType tv@(TValue _ t) = exprOfTValue $ TValue (VType t) TType
