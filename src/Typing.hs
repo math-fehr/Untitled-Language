@@ -594,6 +594,15 @@ typeCaseMatch (constrName, capturedArgs, expr) enumName typArgs = do
   (expr', metadata) <- typeExpr expr
   return $ ((constrName, capturedArgs, expr'), metadata)
 
+checkExists :: [String] -> [String] -> Bool
+checkExists xs expected =
+  all
+    (\x ->
+       case find (== x) expected of
+         Just _ -> True
+         Nothing -> False)
+    xs
+
 typeExpr :: TypingMonad m => Expr -> m (TExpr, MetaData)
 typeExpr e@(Expr _ (LocalVar (DI name) id)) =
   getValue (DeBruijn id) >>= \case
@@ -649,8 +658,15 @@ typeExpr (Expr _ (Match e cases)) = do
     TSum name args constrs -> do
       cases' <- forM cases (\c -> typeCaseMatch c name args)
       let cases'' = fst <$> cases'
+      let casesNames = (\(a, _, _) -> a) <$> cases''
       let mtdts = snd <$> cases'
-      -- TODO add checks here
+      when (not $ checkExists casesNames constrs) $ throwError $
+        ConstructorNotInEnum
+      when (not $ checkExists constrs casesNames) $ throwError $
+        NonExhaustiveMatch
+      case duplicate casesNames of
+        Just x -> throwError $ DuplicateConstructorInMatch x
+        Nothing -> return $ ()
       let (_, _, TExpr returntyp _) = head cases''
       let mtdt = (foldr (<>) defMtdt mtdts) <> e_mtdt
       return $ (TExpr returntyp $ Match te cases'', mtdt)

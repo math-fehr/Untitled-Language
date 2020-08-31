@@ -35,4 +35,7 @@ data Error
   | TypeShouldHaveUnrArrows
   | NotAnEnum Expr
   | NotEnoughConstructorArgs String
+  | ConstructorNotInEnum
+  | NonExhaustiveMatch
+  | DuplicateConstructorInMatch String
   deriving (Eq, Show)
