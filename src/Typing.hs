@@ -524,9 +524,10 @@ defDecl name =
     case decl of
       DDef DefT {def_name, def_type, def_args, def_body} -> do
         expr <- desugarDef typ def_args def_body
-        texpr@(TExpr found_typ _) <- fst <$> typeExprAndEval expr
+        (texpr@(TExpr found_typ _), mtdt) <- typeExprAndEval expr
         expectType typ def_body found_typ
-        interpretAndDef texpr
+        if mtdt ^. mtdt_comptime then interpretAndDef texpr
+                                 else interpret texpr
       DEnum enum_name enum_args constructors ->
         let n = length enum_args
          in if n == 0
@@ -568,8 +569,10 @@ extractVal :: TValue -> Value
 extractVal (TValue val _) = val
 
 typeExpr :: TypingMonad m => Expr -> m (TExpr, MetaData)
-typeExpr e@(Expr _ (LocalVar (DI name) id)) =
-  (, defMtdt & mtdt_interp .~ id) <$> texpr
+typeExpr e@(Expr _ (LocalVar (DI name) id)) = getValue (DeBruijn id)
+  >>= \case
+        Just _ -> (, defMtdt & mtdt_interp .~ id) <$> texpr
+        Nothing -> (, defMtdt & mtdt_comptime .~ False & mtdt_interp .~ id) <$> texpr
   where
     texpr =
       TExpr <$> (typeVariable name e $ DeBruijn id) <*>
