@@ -466,7 +466,7 @@ declEnum :: TypingMonad m => String -> [(DebugInfo String, Expr)] -> [(String, E
 declEnum name arguments constructors = undefined
   
 checkConstrType :: TypingMonad m => Type -> m Type
-checkConstrType = undefined
+checkConstrType = return . id
 
 -- compute the type of the declaration, potentatially by using other decl or defs.
 declDecl :: TypingMonad m => String -> m Type
@@ -531,11 +531,17 @@ defDecl name =
         texpr <- fst <$> typeExprAndEval expr
         interpret texpr
       DEnum enum_name enum_args constructors -> 
-        return $ flip TValue typ $ VForall [] (length enum_args) TType $ Expr SourcePos
-               $ Value $ TValue (VType $ TSum [] constructors) TType
+        let n = length enum_args
+        in if n == 0
+              then return $ TValue (VType $ TSum [] constructors) TType
+              else return $ flip TValue typ $ VForall [] (length enum_args) TType $ Expr SourcePos
+                          $ Value $ TValue (VType $ TSum [] constructors) TType
       DConstr constr_name constr_type ->
-        return $ flip TValue typ $ VFun [] (countArguments typ)
-               $ TExpr typ $ Constructor constr_name
+        let n = countArguments typ
+        in if n == 0
+              then return $ flip TValue typ $ VEnum constr_name [] []
+              else return $ flip TValue typ $ VFun [] (countArguments typ)
+                          $ TExpr typ $ Constructor constr_name
       _ -> throwError (InternalError "Struct decl unimplemented")
 
 typeVariable :: TypingMonad m => String -> Expr -> Variable -> m Type

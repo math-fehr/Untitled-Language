@@ -112,6 +112,12 @@ displayValue (VTuple (v1:vs)) =
   foldl (\str v -> str ++ ", " ++ displayValue v) (displayValue v1) vs ++ ")"
 displayValue (VFun _ i _) = "<lambda#" ++ show i ++ ">"
 displayValue (VForall _ _ _ _) = "<forall>"
+displayValue (VEnum constr _ []) = "[" ++ constr ++ "]"
+displayValue (VEnum constr _ (a1 : as)) = 
+    "[" ++ constr ++ " "
+    ++ foldl (\str a -> " (" ++ displayValue a ++ ")")
+             ("(" ++ displayValue a1 ++ ")") as
+    ++ "]"
 
 displayField :: (String, Value) -> String
 displayField (name, value) = name ++ " = " ++ displayValue value
