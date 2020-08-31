@@ -72,10 +72,25 @@ programmers that don't know this theory.
 Each variable and expression is tagged "linear" if it contains at least one
 resource inside and is tagged "non-linear" if it contains only pure information
 and no resources. The linear type systems ensures that linear values cannot be
-duplicated or deleted. They only exists in a single variable at any moment.
+duplicated or deleted. They only exists in a single variable at any moment. This
+is very similar to the Rust language which also use linear type theory.
 
-TODO
+In practice functions are explicitly typed depending on their interaction with
+linearity. If we have `f : a -> b` that means that `f` only deals with
+non-linear types as if it only deals with information. It is thus free to copy
+the value of type `a` as much at it wants and to put multiple such values in
+`b`. On the calling side, the caller must call `f` on an argument that is tagged
+as non-linear but it can allow to tag the result as non-linear.
 
+On the other hand, if we have `f : a -@ b`, that means that `f` deals with
+linear type i.e. resources. This contract guarantees that `f` uses `a` only
+once and that `a` appear once in `b`. In this case `f` can be called on any
+variable, linear or not. If `f` is called on a non-linear variable it's output
+can be used in non-linear ways at will.
+
+On hindsight, this system is insufficient to handle all the use cases we thought
+of, so we'll have to change it quite massively for it to be usable in the real
+world. In particular, we'll move to include the linearity inside the types.
 
 ## Monads
 
