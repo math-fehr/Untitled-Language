@@ -6,6 +6,9 @@ module IR where
 import Control.Lens
 import qualified Data.Map as M
 import Data.Map (Map)
+import qualified Data.Set as S
+import Data.Set (Set)
+import Data.Foldable
 
 newtype DebugInfo a =
   DI a
@@ -198,3 +201,51 @@ insertDeclaration decl prog =
 
 getDeclaration :: String -> Program -> Decl
 getDeclaration ident p = prog_defs p M.! ident
+
+
+getDefsInTExpr :: ExprT Type TExpr -> Set String
+getDefsInTExpr (LocalVar _ _) = S.empty
+getDefsInTExpr (Def s) = S.singleton s
+getDefsInTExpr (Constructor _) = S.empty
+getDefsInTExpr (Value (TValue v _)) = getDefsInValue v
+getDefsInTExpr (Let _ (TExpr _ val) _ (TExpr _ body)) =
+  (getDefsInTExpr val) <> (getDefsInTExpr body)
+getDefsInTExpr (IfThenElse (TExpr _ e1) (TExpr _ e2) (TExpr _ e3)) =
+  (getDefsInTExpr e1) <> (getDefsInTExpr e2) <> (getDefsInTExpr e3)
+getDefsInTExpr (Call (TExpr _ e1) (TExpr _ e2)) =
+  (getDefsInTExpr e1) <> (getDefsInTExpr e2)
+getDefsInTExpr (Operator _) = S.empty
+getDefsInTExpr (Tuple es) = fold (getDefsInTExpr <$> (\(TExpr _ e) -> e) <$> es)
+getDefsInTExpr (Lambda _ _ _ (TExpr _ body)) = getDefsInTExpr body
+getDefsInTExpr (ForAll _ _ (TExpr _ e)) = getDefsInTExpr e
+
+
+getDefsInExpr :: ExprT Expr Expr -> Set String
+getDefsInExpr (LocalVar _ _) = S.empty
+getDefsInExpr (Def s) = S.singleton s
+getDefsInExpr (Constructor _) = S.empty
+getDefsInExpr (Value (TValue v _)) = getDefsInValue v
+getDefsInExpr (Let _ (Expr _ val) (Just (Expr _ typ)) (Expr _ body)) =
+  (getDefsInExpr val) <> (getDefsInExpr typ) <> (getDefsInExpr body)
+getDefsInExpr (Let _ (Expr _ val) Nothing (Expr _ body)) =
+  (getDefsInExpr val) <> (getDefsInExpr body)
+getDefsInExpr (IfThenElse (Expr _ e1) (Expr _ e2) (Expr _ e3)) =
+  (getDefsInExpr e1) <> (getDefsInExpr e2) <> (getDefsInExpr e3)
+getDefsInExpr (Call (Expr _ e1) (Expr _ e2)) =
+  (getDefsInExpr e1) <> (getDefsInExpr e2)
+getDefsInExpr (Operator _) = S.empty
+getDefsInExpr (Tuple es) = fold (getDefsInExpr <$> (\(Expr _ e) -> e) <$> es)
+getDefsInExpr (Lambda _ _ (Expr _ typ) (Expr _ body)) = getDefsInExpr body <> getDefsInExpr typ
+getDefsInExpr (ForAll _ (Expr _ typ) (Expr _ e)) = getDefsInExpr typ <> getDefsInExpr e
+
+
+getDefsInValue :: Value -> Set String
+getDefsInValue VUnit = S.empty
+getDefsInValue (VInt _) = S.empty
+getDefsInValue (VBool _) = S.empty
+getDefsInValue (VType _) = S.empty
+getDefsInValue (VStruct _) = S.empty
+getDefsInValue (VTuple _) = S.empty
+getDefsInValue (VEnum _ _ _) = S.empty
+getDefsInValue (VFun _ _ (TExpr _ e)) = getDefsInTExpr e
+getDefsInValue (VForall _ _ _ (Expr _ e)) = getDefsInExpr e
