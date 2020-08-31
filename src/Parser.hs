@@ -72,6 +72,7 @@ data Expr
   | ManyOp ManyOp [Expr]
   | Forall String Expr Expr
   | IfThenElse Expr Expr Expr
+  | Match Expr [(String, [String], Expr)]
   | Lambda String Expr Expr
   | Parens Expr
   | EType
@@ -205,7 +206,7 @@ expr3Parser :: Parser Expr
 expr3Parser =
   Parens <$> parens exprParser <|> varParser <|>
   IntConst . fromInteger <$> integer <|>
-  arrayParser
+  arrayParser <|> matchParser
 
 arrayParser :: Parser Expr
 arrayParser = braces $ ManyOp MArray <$> sepSemi exprParser
@@ -294,6 +295,24 @@ exprListToCall = foldl1 Call
 
 callParser :: Parser Expr
 callParser = exprListToCall <$> sepBy1 expr3Parser (return ())
+
+matchCaseParser :: Parser (String, [String], Expr)
+matchCaseParser = do
+  reservedOp "|"
+  constr <- identifier
+  args <- many identifier
+  reservedOp "=>"
+  body <- expr2Parser
+  return $ (constr, args, body)
+
+matchParser :: Parser Expr
+matchParser = do
+  reserved "match"
+  expr <- exprParser
+  reserved "with"
+  cases <- many1 matchCaseParser
+  reserved "end"
+  return $ Match expr cases
 
 ifParser :: Parser Expr
 ifParser = do
