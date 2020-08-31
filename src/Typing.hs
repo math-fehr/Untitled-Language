@@ -520,13 +520,13 @@ typeEnum [] constructors = do
       (\(var, typ) -> do
          typ' <- forM typ typeExprToType
          return $ (var, typ'))
-  return $ VType $ Type True $ TSum constructors'
+  return $ VType $ TSum constructors'
 typeEnum ((DI arg_name, arg_typ):args) constructors = do
   arg_typ' <- typeExprToType arg_typ
   addUnrestricted arg_name arg_typ' Nothing
   typedEnum <- typeEnum args constructors
   _ <- leaveScope
-  return $ (VFun [] 1 $ texprOfTValue (TValue typedEnum $ Type True TType))
+  return $ (VFun [] 1 $ texprOfTValue (TValue typedEnum TType))
 
 -- compute the value of a declaration
 defDecl :: TypingMonad m => String -> m TValue
@@ -541,7 +541,7 @@ defDecl name =
         if e_name == name
           then do
             expr <- typeEnum e_args e_constructors
-            interpret $ texprOfTValue $ TValue expr $ (Type True TType)
+            interpret $ texprOfTValue $ TValue expr TType
           else throwError (InternalError "Constructor decl unimplemented")
       _ -> throwError (InternalError "Struct decl unimplemented")
 
@@ -733,13 +733,13 @@ typeExprToType e = do
         "interpreter didn't returned a type when given an expression of type Type"
 
 getTypeFromEnum :: TypingMonad m => [(DebugInfo String, Expr)] -> m Type
-getTypeFromEnum [] = return $ Type True TType
+getTypeFromEnum [] = return TType
 getTypeFromEnum ((_, e):es) = do
   e' <- typeExprToType e
   addUnrestricted "_" e' Nothing
   es' <- getTypeFromEnum es
   _ <- leaveScope
-  return $ Type True $ TForallArrow (DI "_") e' es'
+  return $ TForallArrow (DI "_") e' es'
 
 getTypeFromConstr ::
      TypingMonad m
@@ -757,17 +757,17 @@ getTypeFromConstr e_name ((_, arg):args) e_constr constr_name = do
   addUnrestricted "_" arg' Nothing
   es' <- getTypeFromConstr e_name args e_constr constr_name
   _ <- leaveScope
-  return $ Type True $ TForallArrow (DI "_") arg' es'
+  return $ TForallArrow (DI "_") arg' es'
 
 getTypeFromConstr' :: TypingMonad m => String -> [Expr] -> m Type
 getTypeFromConstr' e_name [] = varType (Global e_name)
 getTypeFromConstr' e_name (arg:args) = do
   arg' <- typeExprToType arg
   es' <- getTypeFromConstr' e_name args
-  return $ Type False $ TLinArrow arg' es'
+  return $ TLinArrow arg' es'
 
 texprOfTValue :: TValue -> TExpr
 texprOfTValue tv@(TValue _ t) = TExpr t $ Value tv
 
 texprOfType :: Type -> TExpr
-texprOfType t = texprOfTValue $ TValue (VType t) $ Type True TType
+texprOfType t = texprOfTValue $ TValue (VType t) TType
