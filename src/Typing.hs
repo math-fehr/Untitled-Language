@@ -594,6 +594,7 @@ typeExpr (Expr _ (Let (DI name) var vartyp body)) = do
     if mtdt ^. mtdt_interp < 0
       then Just <$> extractVal <$> interpretAndDef tevar
       else return Nothing
+  addLinear name typ vval
   (tebody@(TExpr tbody _), body_mtdt) <- typeExpr body
   leaveScope
   return $
