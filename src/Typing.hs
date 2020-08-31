@@ -390,7 +390,7 @@ instance Monad m => TypingMonad (ConcreteTypingMonadT m) where
   freeVariables = do
     local <- use ts_local
     let free =
-          filter (not . (^. lv_isUsed) . snd) $
+          filter (\x -> (not $ (^. lv_isUsed) $ snd x) && ((^. lv_isLinear) $ snd x)) $
           V.ifoldr (\ix x l -> (ix, x) : l) [] local
     return $ S.fromList $ map (DeBruijn . fst) free
   interpret expr = do
