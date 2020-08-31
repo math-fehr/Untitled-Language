@@ -280,12 +280,15 @@ TODO more examples
 
 # Smaller Planned features
 
-## Module and Typeclasses
-
-## Overloadable match
-
-## Full type introspection
-
-## Pattern-matching Forall
-
-## Memory-management
+ - Module and Typeclasses: We plan to implement a module system similar to Ocaml's
+   but to support typeclasses.
+ - Overloadable match: The match will overloadable in certain ways. For example the user will
+   be able to define how to deconstruct a type with a precise constructor even if the constructior
+   is not one of the type. This allow continuity in APIs based on deconstructions.
+ - Full type introspection We'll expand the standard library on types and the used will
+   be able to deconstruct a type in match like any other value.
+ - Currently it is not possible to express polymorphic function which make the language
+   quite unusable for non toy example, We plan to add explicit polymorphism and compile
+   it with monomorphisation.
+ - Memory-management: We plan to add low-level memory management in a way protected by
+   the linear type system
