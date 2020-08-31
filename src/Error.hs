@@ -33,4 +33,6 @@ data Error
   | ArrayNotSameType Type Type
   | IndexingError String
   | TypeShouldHaveUnrArrows
+  | NotAnEnum Expr
+  | NotEnoughConstructorArgs String
   deriving (Eq, Show)

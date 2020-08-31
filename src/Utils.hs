@@ -20,3 +20,7 @@ duplicate (x:l) =
 percolateMaybe :: Monad m => Maybe (m a) -> m (Maybe a)
 percolateMaybe Nothing = return Nothing
 percolateMaybe (Just x) = x >>= return . Just
+
+splitLast :: [a] -> ([a], a)
+splitLast [x] = ([], x)
+splitLast (a: b) = let (hd, tl) = splitLast b in (a: hd, tl)

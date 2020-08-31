@@ -28,6 +28,7 @@ import qualified Data.Vector as V
 import Error
 import IR
 import ULPrelude (intt, prelude)
+import Utils
 
 -- import Interpreter hiding (UndefinedVariable, interpret)
 import qualified Interpreter
@@ -459,7 +460,7 @@ registerDecl decl =
   case decl of
     DDef def -> register (def_name def) decl
     DEnum name _ _ -> register name decl
-    DConstr name _ -> register name decl
+    DConstr _ name _ -> register name decl
     _ -> throwError (InternalError "struct register unimplemented")
 
 checkConstrType :: TypingMonad m => Type -> m Type
@@ -472,7 +473,7 @@ declDecl name =
     DDef DefT {def_name, def_type, def_args, def_body} ->
       typeExprToType def_type
     DEnum e_name e_args e_constructor -> getTypeFromEnum e_args
-    DConstr name typ -> do
+    DConstr _ name typ -> do
       nt <- typeExprToType typ
       checkConstrType nt
       return nt
@@ -531,19 +532,18 @@ defDecl name =
       DEnum enum_name enum_args constructors ->
         let n = length enum_args
          in if n == 0
-              then return $ TValue (VType $ TSum [] constructors) TType
+              then return $ TValue (VType $ TSum enum_name [] constructors) TType
               else return $ flip TValue typ $
                    VForall [] (length enum_args) TType $
                    Expr SourcePos $
                    Value $
-                   TValue (VType $ TSum [] constructors) TType
-      DConstr constr_name constr_type ->
+                   TValue (VType $ TSum enum_name [] constructors) TType
+      DConstr enum_name constr_name constr_type ->
         let n = countArguments typ
          in if n == 0
               then return $ flip TValue typ $ VEnum constr_name [] []
-              else return $ flip TValue typ $ VFun [] (countArguments typ) $
-                   TExpr typ $
-                   Constructor constr_name
+              else return $ flip TValue typ $ VFun [] (countArguments typ)
+                          $ TExpr typ $ Constructor enum_name constr_name
       _ -> throwError (InternalError "Struct decl unimplemented")
 
 typeVariable :: TypingMonad m => String -> Expr -> Variable -> m Type
@@ -567,6 +567,19 @@ mergeType t t' = do
 
 extractVal :: TValue -> Value
 extractVal (TValue val _) = val
+
+extractTypesFromArrow :: Type -> [Type]
+extractTypesFromArrow (TLinArrow t1 t2) = t1 : (extractTypesFromArrow t2)
+extractTypesFromArrow t = [t]
+
+typeCaseMatch :: TypingMonad m => (String, [DebugInfo String], Expr) -> String -> [Value] ->  m ((String, [DebugInfo String], TExpr), MetaData)
+typeCaseMatch (constrName, capturedArgs, expr) enumName typArgs = do
+  (TExpr typ _, _) <- typeExpr $ Expr SourcePos (Def constrName)
+  let (typs, enum) = splitLast $ extractTypesFromArrow typ
+  when (length typs /= length capturedArgs) $ throwError $ NotEnoughConstructorArgs constrName
+  foldM_ (\() (DI s, t) -> addUnrestricted s t Nothing) () (zip capturedArgs typs)
+  (expr', metadata) <- typeExpr expr
+  return $ ((constrName, capturedArgs, expr'), metadata)
 
 typeExpr :: TypingMonad m => Expr -> m (TExpr, MetaData)
 typeExpr e@(Expr _ (LocalVar (DI name) id)) = getValue (DeBruijn id)
@@ -616,6 +629,18 @@ typeExpr (Expr _ (IfThenElse cond thenE elseE)) = do
   return $
     ( TExpr then_type $ IfThenElse tecond tethen teelse
     , cond_mtdt <> then_mtdt <> else_mtdt)
+typeExpr (Expr _ (Match e cases)) = do
+  (te@(TExpr eTyp _), e_mtdt) <- typeExpr e
+  case eTyp of
+    TSum name args constrs -> do
+      cases' <- forM cases (\c -> typeCaseMatch c name args)
+      let cases'' = fst <$> cases'
+      let mtdts = snd <$> cases'
+      -- TODO add checks here
+      let (_, _, TExpr returntyp _) = head cases''
+      let mtdt = (foldr (<>) defMtdt mtdts) <> e_mtdt
+      return $ (TExpr returntyp $ Match te cases'', mtdt)
+    _ -> throwError $ NotAnEnum e
 typeExpr (Expr _ (Call (Expr _ (Operator Plus)) arg)) = typeCallOp Plus arg
 typeExpr (Expr _ (Call (Expr _ (Operator Minus)) arg)) = typeCallOp Minus arg
 typeExpr (Expr _ (Call (Expr _ (Operator Times)) arg)) = typeCallOp Times arg

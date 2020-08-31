@@ -1,9 +1,9 @@
 enum boolEnum : Type
-def := { TrueEnum : boolEnum | FalseEnum : boolEnum }
+def := { TrueEnum : (Bool -@ Int -@ Int -@ boolEnum) | FalseEnum : boolEnum }
 
 decl main : Int
 def :=
-  match TrueEnum with
-  | TrueEnum => 0
+  match TrueEnum True 0 1 with
+  | TrueEnum a b c => (if a then b else c)
   | FalseEnum => 42
   end

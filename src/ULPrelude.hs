@@ -32,7 +32,7 @@ false = TValue (VBool False) boolt
 array :: TValue
 array =
   TValue
-    (VFun [] 2 (TExpr TBool $ Constructor "Array"))
+    (VFun [] 2 (TExpr TBool $ Constructor "" "Array"))
     (TUnrArrow TType (TUnrArrow intt TType)) -- HACK HACK HACK
 
 prelude :: TProgram

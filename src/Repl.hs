@@ -149,8 +149,8 @@ displayType (TChoice []) = "(^)"
 displayType (TChoice (t1:ts)) =
   "(" ++
   foldl (\str t -> str ++ " ^ " ++ displayType t) (displayType t1) ts ++ ")"
-displayType (TSum _ []) = "[|]"
-displayType (TSum _ (t1:ts)) =
+displayType (TSum _ _ []) = "[|]"
+displayType (TSum _ _ (t1:ts)) =
   "[ " ++ foldl (\str t -> str ++ " | " ++ t) t1 ts ++ " ]"
 displayType (TStruct []) = "{&}"
 displayType (TStruct (t1:ts)) =

@@ -181,10 +181,11 @@ indToIr (PInductive name typ args constrs) ctx = do
     mapM
       (\(c_name, typ) -> do
          typ' <- exprToIr typ ctx'
-         return $ DConstr c_name typ')
+         return $ DConstr name c_name typ')
       constrs
   return $
-    DEnum name typ' (fmap (\(DConstr name _) -> name) constrs') : constrs'
+    DEnum name typ' (fmap (\(DConstr _ name _) -> name) constrs') : constrs'
+  return $ DEnum name typ' (fmap (\(DConstr _ name _) -> name) constrs') : constrs'
 
 structToIr :: PStruct -> PIRContext -> Either Error Decl
 structToIr (PStruct name fields) ctx = do

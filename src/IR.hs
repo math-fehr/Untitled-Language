@@ -47,7 +47,7 @@ data Type
   | TTuple [Type]
   | TArray Type Int
   | TChoice [Type]
-  | TSum [Value] [String]
+  | TSum String [Value] [String]
   | TStruct [(String, Type)]
   | TLinArrow Type Type
   | TUnrArrow Type Type
@@ -58,7 +58,7 @@ data Type
   deriving (Show, Eq, Ord)
 
 void :: Type
-void = TSum [] []
+void = TSum "Unit" [] []
 
 unit :: Type
 unit = TTuple []
@@ -111,7 +111,8 @@ data ExprT typ expr
   = LocalVar (DebugInfo String) Int
   | Def String
   -- ^ Unresolved Definition.
-  | Constructor String
+  | Constructor String String
+  -- ^ Name of the enum, then the constructor
   | Value TValue
   | Let
       { name :: DebugInfo String
@@ -167,7 +168,8 @@ data DeclT typ expr
       , eargs :: [(DebugInfo String, typ)]
       , constructors :: [String]
       }
-  | DConstr String typ
+  | DConstr String String typ
+  -- enum name, constr name, and typ
   | DStruct
       { sname :: String
       , fields :: [(String, typ)]
@@ -178,7 +180,7 @@ declName :: DeclT typ expr -> String
 declName (DDef DefT {def_name}) = def_name
 declName DEnum {ename} = ename
 declName DStruct {sname} = sname
-declName (DConstr name _) = name
+declName (DConstr _ name _) = name
 
 type Decl = DeclT Expr Expr
 
@@ -206,12 +208,14 @@ getDeclaration ident p = prog_defs p M.! ident
 getDefsInTExpr :: ExprT Type TExpr -> Set String
 getDefsInTExpr (LocalVar _ _) = S.empty
 getDefsInTExpr (Def s) = S.singleton s
-getDefsInTExpr (Constructor _) = S.empty
+getDefsInTExpr (Constructor _ _) = S.empty
 getDefsInTExpr (Value (TValue v _)) = getDefsInValue v
 getDefsInTExpr (Let _ (TExpr _ val) _ (TExpr _ body)) =
   (getDefsInTExpr val) <> (getDefsInTExpr body)
 getDefsInTExpr (IfThenElse (TExpr _ e1) (TExpr _ e2) (TExpr _ e3)) =
   (getDefsInTExpr e1) <> (getDefsInTExpr e2) <> (getDefsInTExpr e3)
+getDefsInTExpr (Match (TExpr _ e) cases) =
+  (getDefsInTExpr e) <> (fold (getDefsInTExpr <$> (\(_,_,TExpr _ c) -> c) <$> cases ))
 getDefsInTExpr (Call (TExpr _ e1) (TExpr _ e2)) =
   (getDefsInTExpr e1) <> (getDefsInTExpr e2)
 getDefsInTExpr (Operator _) = S.empty
@@ -222,7 +226,7 @@ getDefsInTExpr (ForAll _ _ (TExpr _ e)) = getDefsInTExpr e
 getDefsInExpr :: ExprT Expr Expr -> Set String
 getDefsInExpr (LocalVar _ _) = S.empty
 getDefsInExpr (Def s) = S.singleton s
-getDefsInExpr (Constructor _) = S.empty
+getDefsInExpr (Constructor _ _) = S.empty
 getDefsInExpr (Value (TValue v _)) = getDefsInValue v
 getDefsInExpr (Let _ (Expr _ val) (Just (Expr _ typ)) (Expr _ body)) =
   (getDefsInExpr val) <> (getDefsInExpr typ) <> (getDefsInExpr body)
@@ -230,6 +234,8 @@ getDefsInExpr (Let _ (Expr _ val) Nothing (Expr _ body)) =
   (getDefsInExpr val) <> (getDefsInExpr body)
 getDefsInExpr (IfThenElse (Expr _ e1) (Expr _ e2) (Expr _ e3)) =
   (getDefsInExpr e1) <> (getDefsInExpr e2) <> (getDefsInExpr e3)
+getDefsInExpr (Match (Expr _ e) cases) =
+  (getDefsInExpr e) <> (fold (getDefsInExpr <$> (\(_,_,Expr _ c) -> c) <$> cases ))
 getDefsInExpr (Call (Expr _ e1) (Expr _ e2)) =
   (getDefsInExpr e1) <> (getDefsInExpr e2)
 getDefsInExpr (Operator _) = S.empty

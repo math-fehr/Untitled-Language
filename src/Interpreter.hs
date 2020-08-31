@@ -177,7 +177,7 @@ interpretTExpr (TExpr typ expr) = interpretExpr expr
 interpretExpr :: InterpreterMonad m => ExprT Type TExpr -> m Value
 interpretExpr (LocalVar (DI name) id) = getValue $ DeBruijn id
 interpretExpr (Def name) = getValue $ Global name
-interpretExpr (Constructor name) = getValue $ Global name
+interpretExpr (Constructor _ name) = getValue $ Global name
 interpretExpr (Let name val vartyp body) =
   interpretTExpr val >>= flip withValue (interpretTExpr body)
 interpretExpr (IfThenElse cond thenE elseE) =
@@ -189,6 +189,14 @@ interpretExpr (IfThenElse cond thenE elseE) =
     _ ->
       throwError $
       TypeSystemUnsound "Condition in if-then-else should have been bool"
+interpretExpr (Match e cases) =
+  interpretTExpr e >>= \case
+    (VEnum name _ args) ->
+      case find (\(s, _, _) -> s == name) cases of
+        Just (_, _ , TExpr _ cas) ->
+          (foldr (.) id $ fmap withValue args) $ interpretExpr cas
+        Nothing -> throwError $ TypeSystemUnsound "Match does not have matching constructor"
+    _ -> throwError $ TypeSystemUnsound "Value in match is not a constructor"
 interpretExpr (Tuple exprs) = VTuple <$> mapM interpretTExpr exprs
 interpretExpr (Lambda name _ _ body) = do
   (captured, nbody) <- findCapturedVariables body
@@ -219,10 +227,10 @@ callFun _ _ =
 
 evaluateFun :: InterpreterMonad m => [Value] -> ExprT Type TExpr -> m Value
 evaluateFun args (Operator op) = evaluateOperator op args
-evaluateFun args (Constructor "Array") = case args of
+evaluateFun args (Constructor _ "Array") = case args of
   [VType typ, VInt i] -> return $ VType $ TArray typ (fromInteger i)
   _ -> throwError $ InternalError "Array type constructor on wrong types"
-evaluateFun args (Constructor cons) = return $ VEnum cons [] args
+evaluateFun args (Constructor _ cons) = return $ VEnum cons [] args
 evaluateFun (arg:ctx) body = withValue arg $ evaluateFun ctx body
 evaluateFun [] body = interpretExpr body
 
