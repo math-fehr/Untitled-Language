@@ -189,6 +189,8 @@ interpretExpr (IfThenElse cond thenE elseE) =
       throwError $
       TypeSystemUnsound "Condition in if-then-else should have been bool"
 interpretExpr (Tuple exprs) = VTuple <$> mapM interpretTExpr exprs
+interpretExpr (Constr name idx typs exprs) =
+  VConstr idx <$> mapM interpretTExpr exprs
 interpretExpr (Lambda name _ _ body) = do
   (captured, nbody) <- findCapturedVariables body
   return $ VFun captured 1 nbody

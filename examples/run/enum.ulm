@@ -1,5 +1,5 @@
 enum boolEnum : Type
 def := { TrueEnum : boolEnum | FalseEnum : boolEnum }
 
-decl a : boolEnum -> Int
-def b := 0
+decl a : boolEnum
+def := TrueEnum

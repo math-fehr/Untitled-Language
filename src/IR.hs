@@ -88,7 +88,7 @@ data Value
   | VType Type
   | VStruct [(String, Value)]
   | VTuple [Value]
-  | VConstr Int [Value] Value
+  | VConstr Int [Value]
   | VFun [Value] Int TExpr
   -- ^ The argument is at De Bruijn index 0 and the context in the list is above 0.
   --   The integer is the number of expected arguments before reduction is possible
@@ -117,6 +117,8 @@ data ExprT typ expr
     -- ^ Many Op are called on a big tuple
   | Operator Operator
   | Tuple [expr]
+  | Constr String Int [typ] [expr]
+  -- Enum name, constructor idx, type parameters of the enum, and constructor elements
   | Lambda
       { name :: DebugInfo String
       , linear :: Bool

@@ -445,8 +445,14 @@ typeProgram (Program decls) =
   runT $ do
     loadTProgram prelude
     forM_ decls registerDecl
-    forM_ names declDecl
-    forM_ names defDecl
+    forM_ ["boolEnum"] declDecl
+    forM_ ["boolEnum"] defDecl
+    forM_ ["TrueEnum", "FalseEnum"] declDecl
+    forM_ ["TrueEnum", "FalseEnum"] defDecl
+    forM_ ["a"] declDecl
+    forM_ ["a"] defDecl
+    --forM_ names declDecl
+    --forM_ names defDecl
     getTProgram
   where
     runT :: ConcreteTypingMonad a -> Either Error a
@@ -528,6 +534,20 @@ typeEnum ((DI arg_name, arg_typ):args) constructors = do
   _ <- leaveScope
   return $ exprOfTValue $ TValue (VForall [] arg_typ' typedEnum) TType
 
+desugarConstructor ::
+  TypingMonad m
+  => String
+  -> Int
+  -> [(DebugInfo String, Expr)]
+  -> [Expr]
+  -> Int
+  -> m Expr
+desugarConstructor eName constrId [] [] n_args = do
+  return $ Expr SourcePos $ Constr eName constrId [] $ ((\i -> Expr SourcePos $ LocalVar (DI "_") i) <$> [0..(n_args - 1)])
+desugarConstructor eName constrId [] (arg : args) n_args = do
+  constr <- desugarConstructor eName constrId [] args (n_args + 1)
+  return $ Expr SourcePos $ Lambda (DI "_") True arg constr
+
 -- compute the value of a declaration
 defDecl :: TypingMonad m => String -> m TValue
 defDecl name =
@@ -537,13 +557,17 @@ defDecl name =
         expr <- desugarDef typ def_args def_body
         texpr <- fst <$> typeExprAndEval expr
         interpret texpr
-      DEnum e_name e_args e_constructors ->
+      DEnum e_name e_args e_constrs ->
         if e_name == name
           then do
-            expr <- typeEnum e_args e_constructors
+            expr <- typeEnum e_args e_constrs
             texpr <- fst <$> typeExprAndEval expr
             interpret texpr
-          else throwError (InternalError "Constructor decl unimplemented")
+          else do
+          let ((_, constr_args), constrIdx) = (fromJust $ find (\((constr_name, _), _) -> constr_name == name) (zip e_constrs [0..]))
+          expr <- desugarConstructor e_name constrIdx e_args constr_args 0
+          texpr <- fst <$> typeExprAndEval expr
+          interpret texpr
       _ -> throwError (InternalError "Struct decl unimplemented")
 
 typeVariable :: TypingMonad m => String -> Expr -> Variable -> m Type
@@ -639,6 +663,12 @@ typeExpr (Expr _ (Tuple es)) = do
   let typs = fmap (\(TExpr typ _, _) -> typ) tees
   let mtdt = foldr (<>) defMtdt $ fmap snd tees
   return $ (, mtdt) $ TExpr (TTuple typs) $ Tuple $ fmap fst tees
+typeExpr (Expr _ (Constr name int [] exprs)) = do
+  tees <- mapM typeExpr exprs
+  let mtdt = foldr (<>) defMtdt $ fmap snd tees
+  let typedExprs = fmap (\(e, _) -> e) tees
+  enumTyp <- typeVariable name (exprOfType TType) (Global name)
+  return $ (, mtdt) $ TExpr enumTyp $ Constr name int [] typedExprs
 typeExpr (Expr _ (Lambda (DI name) linear typ body)) = do
   typ <- typeExprToType typ
   (if linear
@@ -776,5 +806,5 @@ exprOfTValue tv@(TValue _ t) = Expr SourcePos $ Value tv
 texprOfType :: Type -> TExpr
 texprOfType t = texprOfTValue $ TValue (VType t) TType
 
-exprOfType :: TValue -> Expr
-exprOfType tv@(TValue _ t) = exprOfTValue $ TValue (VType t) TType
+exprOfType :: Type -> Expr
+exprOfType t = exprOfTValue $ TValue (VType t) TType
