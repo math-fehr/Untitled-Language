@@ -1,6 +1,6 @@
 # ULM Language
 
-The Uniform Linear Monadic Language aim to merge three core features that we
+The Uniform Linear Monadic Language aims to merge three core features that we
 think would be useful for reliable and safe software. We aim to bridge the gap
 between, on one hand, functional languages like Haskell and OCaml where
 everything is nice and "simple" but opaque, and on the other hand, low-level
@@ -19,7 +19,7 @@ interpreter. Having an interpreter is not a waste of time because it helps
 development and is required anyway during the compilation process.
 
 The ULM language is really unfinished. Because of various constraints, we could
-only start actually working on it about 10 days ago, so we've only had half the
+only start seriously working on it about 10 days ago, so we've only had half the
 time of the JAM to do this. I'll try to mark clearly what is already done and
 what is planned in this description/documentation.
 
