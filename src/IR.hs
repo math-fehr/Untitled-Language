@@ -37,9 +37,7 @@ data Variable
 
 -- | The *concrete* values for types.
 data Type
-  = TVar (DebugInfo String) Int
-  -- ^ Type variable bounded by a Forall (de Bruijn)
-  | TBool
+  = TBool
   | TType
   -- ^ The type of a type
   | TInt IntType
@@ -51,7 +49,7 @@ data Type
   | TStruct [(String, Type)]
   | TLinArrow Type Type
   | TUnrArrow Type Type
-  | TForallArrow (DebugInfo String) Type Type
+  | TForallArrow (DebugInfo String) Type Expr
   | TNewType String [TValue] Type
   -- ^ A type constructor name, it's arguments if any and the underlying type
   --   The arguments must have an equality. For now only bool, int and type are supported

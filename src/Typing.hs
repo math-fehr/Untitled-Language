@@ -505,17 +505,11 @@ desugarDef typ l body =
                , argtyp = Expr SourcePos $ Value $ TValue (VType arg) TType
                , body
                })
-        TForallArrow argname arg tbody -> do
-          body <- desugarDef tbody t body
-          return
-            (Expr SourcePos $
-             ForAll h (Expr SourcePos $ Value $ TValue (VType arg) TType) body)
         _ -> throwError DeclarationFunctionTypeArgumentNumberMismatch
   
 countArguments :: Type -> Int
 countArguments (TLinArrow _ t) = 1 + countArguments t
 countArguments (TUnrArrow _ t) = 1 + countArguments t
-countArguments (TForallArrow _ _ t) = 1 + countArguments t
 countArguments _ = 0
 
 -- compute the value of a declaration
@@ -655,6 +649,18 @@ typeExpr (Expr _ (Call funE argE)) = do
       (tearg@(TExpr targ _), arg_mtdt) <- hideLinear $ typeExpr argE
       expectType expectedArgT argE targ
       return $ (TExpr tbody $ Call tefun tearg, called_mtdt <> arg_mtdt)
+    TForallArrow (DI argname) expectedArgT bodyT -> do
+      (tearg@(TExpr targ _), arg_mtdt) <- hideLinear $ typeExpr argE
+      expectType expectedArgT argE targ
+      (TValue argValue _) <- interpret tearg
+      addUnrestricted argname expectedArgT (Just argValue)
+      typedBodyType@(TExpr bodyTypeT _) <- fst <$> typeExpr bodyT
+      expectType TType bodyT bodyTypeT
+      (TValue finalisedBodyTypeValue _) <- interpret typedBodyType
+      finalisedBodyType <- case finalisedBodyTypeValue of
+                             VType typ -> return typ
+      leaveScope
+      return $ (TExpr finalisedBodyType $ Call tefun tearg, called_mtdt <> arg_mtdt)
     _ -> throwError $ NotAnArrow tfun
 typeExpr (Expr _ (Tuple es)) = do
   tees <- mapM typeExpr es
@@ -682,11 +688,8 @@ typeExpr (Expr _ (Lambda (DI name) linear typ body)) = do
     Lambda (DI name) linear typ tebody
 typeExpr (Expr _ (ForAll (DI name) typ expr)) = do
   typ' <- typeExprToType typ
-  addUnrestricted name typ' Nothing
-  expr' <- typeExprToType expr
-  _ <- leaveScope
   return $ (, defMtdt) $ TExpr TType $ Value $
-    TValue (VType $ TForallArrow (DI name) typ' expr') TType
+    TValue (VType $ TForallArrow (DI name) typ' expr) TType
 typeExpr (Expr _ (Operator Arrow)) =
   let arrowtype = TUnrArrow TType $ TUnrArrow TType TType
    in return $ (, defMtdt) $ TExpr arrowtype $ Operator Arrow
@@ -773,9 +776,10 @@ typeExprToType e = do
 
 getTypeFromEnum :: TypingMonad m => [(DebugInfo String, Expr)] -> m Type
 getTypeFromEnum [] = return TType
-getTypeFromEnum ((_, e):es) = do
+getTypeFromEnum ((DI name, e):es) = do
   e' <- typeExprToType e
-  addUnrestricted "_" e' Nothing
+  addUnrestricted name e' Nothing
   es' <- getTypeFromEnum es
-  return $ TForallArrow (DI "_") e' es'
+  leaveScope
+  return $ TForallArrow (DI name) e' $ Expr SourcePos $ Value $ flip TValue TType $ VType es'
 

@@ -136,7 +136,7 @@ indTypToIr (BinOp BLinearArrow _ _) _ _ = do
   Left $ TypeShouldHaveUnrArrows
 indTypToIr (BinOp BUnrestrictedArrow e1 e2) (arg:args) ctx = do
   e1' <- exprToIr e1 ctx
-  let ctx' = addLocalVar "_" ctx
+  let ctx' = addLocalVar arg ctx
   (e2', ctx'') <- indTypToIr e2 args ctx'
   return ((DI arg, e1') : e2', ctx'')
 indTypToIr (BinOp BUnrestrictedArrow _ _) [] ctx = Left $ NotEnoughArgs

@@ -128,7 +128,6 @@ displayField :: (String, Value) -> String
 displayField (name, value) = name ++ " = " ++ displayValue value
 
 displayType :: Type -> String
-displayType (TVar (DI name) id) = name ++ "<" ++ show id ++ ">"
 displayType TBool = "Bool"
 displayType TType = "Type"
 -- displayType (TInt it) = displayIntType it
@@ -159,8 +158,8 @@ displayType (TUnrArrow arg ret) =
   if isArrow arg
     then "(" ++ displayType arg ++ ") -> " ++ displayType ret
     else displayType arg ++ " -> " ++ displayType ret
-displayType (TForallArrow (DI name) argt rett) =
-  "forall (" ++ name ++ " : " ++ displayType argt ++ "). " ++ displayType rett
+displayType (TForallArrow (DI name) argt _) =
+  "forall (" ++ name ++ " : " ++ displayType argt ++ "). ???"
 displayType (TNewType name [] typ) =
   "<" ++ name ++ " := " ++ displayType typ ++ ">"
 displayType (TNewType name (a1:as) typ) =
