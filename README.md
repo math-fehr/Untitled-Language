@@ -261,6 +261,21 @@ decl fib_naive : Int -> Int
 def n = if n == 0 then 1 else fib (n -1) + fib (n -2)
 ```
 
+### First-order types
+
+```
+decl type : Int -> Type
+def x := if x == 0
+           then Int
+           else Bool
+
+decl fint : type 0
+def := 42
+
+decl fbool : type 1
+def := True
+```
+
 TODO more examples
 
 # Smaller Planned features
