@@ -573,7 +573,14 @@ typeExpr e@(Expr _ (LocalVar (DI name) id)) =
     texpr =
       TExpr <$> (typeVariable name e $ DeBruijn id) <*>
       (return $ LocalVar (DI name) id)
-typeExpr e@(Expr _ (Def def)) = (, defMtdt) <$> texpr
+typeExpr e@(Expr _ (Def def)) = do
+  status <- globalStatus def
+  case status of
+    Registered _ -> do
+      declDecl def
+      (, defMtdt) <$> texpr
+    _ ->
+      (, defMtdt) <$> texpr
   where
     texpr = TExpr <$> (typeVariable def e $ Global def) <*> (return (Def def))
 typeExpr (Expr _ (Value (TValue val typ))) =
