@@ -20,7 +20,7 @@ development and is required anyway during the compilation process.
 
 The ULM language is really unfinished. Because of various constraints, we could
 only start seriously working on it about 10 days ago, so we've only had half the
-time of the JAM to do this. I'll try to mark clearly what is already done and
+time of the JAM to do this. We will try to mark clearly what is already done and
 what is planned in this description/documentation.
 
 We already have a REPL working, See the "Getting Started" section
@@ -65,7 +65,7 @@ information like an integer that can be passed around. Luckily for us such a
 type system already exists and is called a linear type system which stems from
 linear logic. Those that have a computer science background but don't know
 linear logic can look [there](https://en.wikipedia.org/wiki/Linear_logic). Here
-I'll explain how it works in our language in way that can be understood by
+We'll explain how it works in our language in way that can be understood by
 programmers that don't know this theory.
 
 Each variable and expression is tagged "linear" if it contains at least one
