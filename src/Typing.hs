@@ -455,7 +455,7 @@ registerDecl decl =
     DDef def -> register (def_name def) decl
     _ -> throwError (InternalError "Enum and struct decl unimplemented")
 
--- compute the type of the declaration, potentatially by using other decl or defs.
+-- compute the type of the declaration, potentially by using other decl or defs.
 declDecl :: TypingMonad m => String -> m Type
 declDecl name =
   decl name $ \case
