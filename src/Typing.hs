@@ -462,14 +462,6 @@ registerDecl decl =
     DConstr name _ -> register name decl
     _ -> throwError (InternalError "struct register unimplemented")
 
-declConstructor :: TypingMonad m => Type -> String -> Expr -> Decl -> m Type
-declConstructor enum_type constr_name constr_type _ = do
-  typ <- typeExprAndEval constr_type
-  undefined
-
-declEnum :: TypingMonad m => String -> [(DebugInfo String, Expr)] -> [(String, Expr)] -> m Type
-declEnum name arguments constructors = undefined
-  
 checkConstrType :: TypingMonad m => Type -> m Type
 checkConstrType = return . id
 
@@ -533,7 +525,8 @@ defDecl name =
     case decl of
       DDef DefT {def_name, def_type, def_args, def_body} -> do
         expr <- desugarDef typ def_args def_body
-        texpr <- fst <$> typeExprAndEval expr
+        texpr@(TExpr found_typ _) <- fst <$> typeExprAndEval expr
+        expectType typ def_body found_typ
         interpretAndDef texpr
       DEnum enum_name enum_args constructors -> 
         let n = length enum_args
