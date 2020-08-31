@@ -69,7 +69,7 @@ addLocalVar :: String -> PIRContext -> PIRContext
 addLocalVar str = pirctx_local %~ (str :)
 
 ttypeExpr :: IR.Expr
-ttypeExpr = IR.Expr SourcePos $ Value $ TValue (VType TType) TType
+ttypeExpr = IR.Expr SourcePos $ Def "Type"
 
 -- Transform a parsed expression to an IR expression
 exprToIr :: Parser.Expr -> PIRContext -> Either Error IR.Expr
