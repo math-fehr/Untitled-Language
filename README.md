@@ -107,6 +107,16 @@ syntax of monads, while staying a pure language
 
 # Getting Started
 
+We only have a REPL for now. However you can load files in the REPL
+with `:l filename`.
+
+## With stack
+
+do `stack init` then `stack run Untitled-Language` (the language was still named
+"Untitled-language at the project creation time). You now have a REPL !
+
+## With Nix
+
 TODO
 
 # Current primitives and syntax
@@ -243,7 +253,7 @@ decl fib_naive : Int -> Int
 def n = if n == 0 then 1 else fib (n -1) + fib (n -2)
 ```
 
-### Merge sort
+TODO more examples
 
 # Smaller Planned features
 
