@@ -245,12 +245,12 @@ ini = do
   lift $ Ty.loadTProgram prelude
   liftIO $
     putStrLn
-      "Welcome to the Untitled Language Repl !\n\
-          \        _   _ _     __  __ \n\
-          \       | | | | |   |  \\/  |\n\
-          \       | | | | |   | |\\/| |\n\
-          \       | |_| | |___| |  | |\n\
-          \        \\___/|_____|_|  |_|\n"
+      "Welcome to the Uniform Linear Monadic language Repl !\n\
+      \               _   _ _     __  __ \n\
+      \              | | | | |   |  \\/  |\n\
+      \              | | | | |   | |\\/| |\n\
+      \              | |_| | |___| |  | |\n\
+      \               \\___/|_____|_|  |_|\n"
 
 prompt :: MultiLine -> ReplM String
 prompt MultiLine = return "\\-> "
