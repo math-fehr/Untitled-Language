@@ -126,14 +126,15 @@ displayType :: Type -> String
 displayType (TVar (DI name) id) = name ++ "<" ++ show id ++ ">"
 displayType TBool = "Bool"
 displayType TType = "Type"
-displayType (TInt it) = displayIntType it
+-- displayType (TInt it) = displayIntType it
+displayType (TInt it) = "Int" -- HACK
 displayType TByte = "Byte"
 displayType (TTuple []) = "(&)"
 displayType (TTuple (t1:ts)) =
   "(" ++
   foldl (\str t -> str ++ " & " ++ displayType t) (displayType t1) ts ++ ")"
 displayType (TArray t size) =
-  "Array<" ++ displayType t ++ "," ++ show size ++ ">"
+  "Array (" ++ displayType t ++ ") " ++ show size
 displayType (TChoice []) = "(^)"
 displayType (TChoice (t1:ts)) =
   "(" ++
