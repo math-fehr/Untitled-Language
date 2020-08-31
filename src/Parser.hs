@@ -171,7 +171,7 @@ reservedOp = Token.reservedOp lexer
 
 parens = Token.parens lexer
 
-integer = Token.integer lexer
+integer = Token.natural lexer
 
 semicolon = Token.semi lexer
 
