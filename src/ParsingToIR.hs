@@ -122,7 +122,7 @@ exprToIr (Parser.IfThenElse cond e1 e2) ctx = do
 exprToIr (Parser.Lambda name arg body) ctx = do
   arg' <- exprToIr arg ctx
   body' <- exprToIr body (addLocalVar name ctx)
-  return $ Expr SourcePos $ IR.Lambda (DI name) True arg' body'
+  return $ Expr SourcePos $ IR.Lambda (DI name) False arg' body'
 exprToIr (Parser.Parens e) ctx = exprToIr e ctx
 
 -- Transform a parsed function to an IR function
