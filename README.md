@@ -23,7 +23,7 @@ only start actually working on it about 10 days ago, so we've only had half the
 time of the JAM to do this. I'll try to mark clearly what is already done and
 what is planned in this description/documentation.
 
-We already have a REPL working at TODO.
+We already have a REPL working, See the "Getting Started" section
 
 Let's discuss the core features:
 
@@ -43,7 +43,6 @@ obviously Turing-complete. You can perfectly do:
 ```
 match type with
   | Array n elem_type => ...
-  | Option typ => ...
   | Int => ...
   | _ => ...
 ```
@@ -100,7 +99,7 @@ need an `IO` monad like the one of Haskell and a more general monad theory. This
 had not yet been implemented by lack of time. One thing that the combination of
 a linear type system and monad allow is for example to be able to extract
 `stdout` as a linear ressource type from `IO` and then pass it around as a
-linear value, Using it in function like `print_int : OutStream -@ Int ->
+linear value, Using it in function like `printint : OutStream -@ Int ->
 OutStream` that consume and use it to print the integer, then return the output
 stream after the effect. This allow some limited side-effect power without the
 syntax of monads, while staying a pure language
@@ -212,11 +211,11 @@ def arg := body
 However a function could use another function in it's type definition like
 
 ```
-decl func : compute_type_of_func arg1 arg2
+decl func : computetypeoffunc arg1 arg2
 def arg := body
 ```
 
-During the typing of `func`, `compute_type_of_func` is fully evaluated and the
+During the typing of `func`, `computetypeoffunc` is fully evaluated and the
 result must be of type `Type`, this value of type is then used as the type of
 `func`. In fact, in the previous declaration, `Type1 -> Type2` was a normal
 expression that used the operator `->` on `Type1` and `Type2`. The operator `->`
