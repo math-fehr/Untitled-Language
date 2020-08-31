@@ -71,14 +71,21 @@ addLocalVar str = pirctx_local %~ (str :)
 ttypeExpr :: IR.Expr
 ttypeExpr = IR.Expr SourcePos $ Def "Type"
 
-matchCaseToIr :: (String, [String], Parser.Expr) -> PIRContext -> Either Error (String, [DebugInfo String], IR.Expr)
+matchCaseToIr ::
+     (String, [String], Parser.Expr)
+  -> PIRContext
+  -> Either Error (String, [DebugInfo String], IR.Expr)
 matchCaseToIr (constr, args, e) ctx = do
   let ctx' = foldl (flip addLocalVar) ctx args
   let args' = DI <$> args
   e' <- exprToIr e ctx'
   return $ (constr, args', e')
 
-matchToIr :: Parser.Expr -> [(String, [String], Parser.Expr)] -> PIRContext -> Either Error IR.Expr
+matchToIr ::
+     Parser.Expr
+  -> [(String, [String], Parser.Expr)]
+  -> PIRContext
+  -> Either Error IR.Expr
 matchToIr e cases ctx = do
   e' <- exprToIr e ctx
   cases' <- forM cases (flip matchCaseToIr ctx)
@@ -185,7 +192,8 @@ indToIr (PInductive name typ args constrs) ctx = do
       constrs
   return $
     DEnum name typ' (fmap (\(DConstr _ name _) -> name) constrs') : constrs'
-  return $ DEnum name typ' (fmap (\(DConstr _ name _) -> name) constrs') : constrs'
+  return $
+    DEnum name typ' (fmap (\(DConstr _ name _) -> name) constrs') : constrs'
 
 structToIr :: PStruct -> PIRContext -> Either Error Decl
 structToIr (PStruct name fields) ctx = do

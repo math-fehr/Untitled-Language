@@ -391,7 +391,8 @@ instance Monad m => TypingMonad (ConcreteTypingMonadT m) where
   freeVariables = do
     local <- use ts_local
     let free =
-          filter (\x -> (not $ (^. lv_isUsed) $ snd x) && ((^. lv_isLinear) $ snd x)) $
+          filter
+            (\x -> (not $ (^. lv_isUsed) $ snd x) && ((^. lv_isLinear) $ snd x)) $
           V.ifoldr (\ix x l -> (ix, x) : l) [] local
     return $ S.fromList $ map (DeBruijn . fst) free
   interpret expr = do
@@ -527,12 +528,14 @@ defDecl name =
         expr <- desugarDef typ def_args def_body
         (texpr@(TExpr found_typ _), mtdt) <- typeExprAndEval expr
         expectType typ def_body found_typ
-        if mtdt ^. mtdt_comptime then interpretAndDef texpr
-                                 else interpret texpr
+        if mtdt ^. mtdt_comptime
+          then interpretAndDef texpr
+          else interpret texpr
       DEnum enum_name enum_args constructors ->
         let n = length enum_args
          in if n == 0
-              then return $ TValue (VType $ TSum enum_name [] constructors) TType
+              then return $
+                   TValue (VType $ TSum enum_name [] constructors) TType
               else return $ flip TValue typ $
                    VForall [] (length enum_args) TType $
                    Expr SourcePos $
@@ -542,8 +545,9 @@ defDecl name =
         let n = countArguments typ
          in if n == 0
               then return $ flip TValue typ $ VEnum constr_name [] []
-              else return $ flip TValue typ $ VFun [] (countArguments typ)
-                          $ TExpr typ $ Constructor enum_name constr_name
+              else return $ flip TValue typ $ VFun [] (countArguments typ) $
+                   TExpr typ $
+                   Constructor enum_name constr_name
       _ -> throwError (InternalError "Struct decl unimplemented")
 
 typeVariable :: TypingMonad m => String -> Expr -> Variable -> m Type
@@ -572,20 +576,30 @@ extractTypesFromArrow :: Type -> [Type]
 extractTypesFromArrow (TLinArrow t1 t2) = t1 : (extractTypesFromArrow t2)
 extractTypesFromArrow t = [t]
 
-typeCaseMatch :: TypingMonad m => (String, [DebugInfo String], Expr) -> String -> [Value] ->  m ((String, [DebugInfo String], TExpr), MetaData)
+typeCaseMatch ::
+     TypingMonad m
+  => (String, [DebugInfo String], Expr)
+  -> String
+  -> [Value]
+  -> m ((String, [DebugInfo String], TExpr), MetaData)
 typeCaseMatch (constrName, capturedArgs, expr) enumName typArgs = do
   (TExpr typ _, _) <- typeExpr $ Expr SourcePos (Def constrName)
   let (typs, enum) = splitLast $ extractTypesFromArrow typ
-  when (length typs /= length capturedArgs) $ throwError $ NotEnoughConstructorArgs constrName
-  foldM_ (\() (DI s, t) -> addUnrestricted s t Nothing) () (zip capturedArgs typs)
+  when (length typs /= length capturedArgs) $ throwError $
+    NotEnoughConstructorArgs constrName
+  foldM_
+    (\() (DI s, t) -> addUnrestricted s t Nothing)
+    ()
+    (zip capturedArgs typs)
   (expr', metadata) <- typeExpr expr
   return $ ((constrName, capturedArgs, expr'), metadata)
 
 typeExpr :: TypingMonad m => Expr -> m (TExpr, MetaData)
-typeExpr e@(Expr _ (LocalVar (DI name) id)) = getValue (DeBruijn id)
-  >>= \case
-        Just _ -> (, defMtdt & mtdt_interp .~ id) <$> texpr
-        Nothing -> (, defMtdt & mtdt_comptime .~ False & mtdt_interp .~ id) <$> texpr
+typeExpr e@(Expr _ (LocalVar (DI name) id)) =
+  getValue (DeBruijn id) >>= \case
+    Just _ -> (, defMtdt & mtdt_interp .~ id) <$> texpr
+    Nothing ->
+      (, defMtdt & mtdt_comptime .~ False & mtdt_interp .~ id) <$> texpr
   where
     texpr =
       TExpr <$> (typeVariable name e $ DeBruijn id) <*>

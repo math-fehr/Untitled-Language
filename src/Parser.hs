@@ -206,7 +206,8 @@ expr3Parser :: Parser Expr
 expr3Parser =
   Parens <$> parens exprParser <|> varParser <|>
   IntConst . fromInteger <$> integer <|>
-  arrayParser <|> matchParser
+  arrayParser <|>
+  matchParser
 
 arrayParser :: Parser Expr
 arrayParser = braces $ ManyOp MArray <$> sepSemi exprParser

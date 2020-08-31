@@ -215,7 +215,8 @@ getDefsInTExpr (Let _ (TExpr _ val) _ (TExpr _ body)) =
 getDefsInTExpr (IfThenElse (TExpr _ e1) (TExpr _ e2) (TExpr _ e3)) =
   (getDefsInTExpr e1) <> (getDefsInTExpr e2) <> (getDefsInTExpr e3)
 getDefsInTExpr (Match (TExpr _ e) cases) =
-  (getDefsInTExpr e) <> (fold (getDefsInTExpr <$> (\(_,_,TExpr _ c) -> c) <$> cases ))
+  (getDefsInTExpr e) <>
+  (fold (getDefsInTExpr <$> (\(_, _, TExpr _ c) -> c) <$> cases))
 getDefsInTExpr (Call (TExpr _ e1) (TExpr _ e2)) =
   (getDefsInTExpr e1) <> (getDefsInTExpr e2)
 getDefsInTExpr (Operator _) = S.empty
@@ -235,7 +236,8 @@ getDefsInExpr (Let _ (Expr _ val) Nothing (Expr _ body)) =
 getDefsInExpr (IfThenElse (Expr _ e1) (Expr _ e2) (Expr _ e3)) =
   (getDefsInExpr e1) <> (getDefsInExpr e2) <> (getDefsInExpr e3)
 getDefsInExpr (Match (Expr _ e) cases) =
-  (getDefsInExpr e) <> (fold (getDefsInExpr <$> (\(_,_,Expr _ c) -> c) <$> cases ))
+  (getDefsInExpr e) <>
+  (fold (getDefsInExpr <$> (\(_, _, Expr _ c) -> c) <$> cases))
 getDefsInExpr (Call (Expr _ e1) (Expr _ e2)) =
   (getDefsInExpr e1) <> (getDefsInExpr e2)
 getDefsInExpr (Operator _) = S.empty

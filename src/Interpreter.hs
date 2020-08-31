@@ -193,9 +193,11 @@ interpretExpr (Match e cases) =
   interpretTExpr e >>= \case
     (VEnum name _ args) ->
       case find (\(s, _, _) -> s == name) cases of
-        Just (_, _ , TExpr _ cas) ->
+        Just (_, _, TExpr _ cas) ->
           (foldr (.) id $ fmap withValue args) $ interpretExpr cas
-        Nothing -> throwError $ TypeSystemUnsound "Match does not have matching constructor"
+        Nothing ->
+          throwError $
+          TypeSystemUnsound "Match does not have matching constructor"
     _ -> throwError $ TypeSystemUnsound "Value in match is not a constructor"
 interpretExpr (Tuple exprs) = VTuple <$> mapM interpretTExpr exprs
 interpretExpr (Lambda name _ _ body) = do
@@ -227,9 +229,10 @@ callFun _ _ =
 
 evaluateFun :: InterpreterMonad m => [Value] -> ExprT Type TExpr -> m Value
 evaluateFun args (Operator op) = evaluateOperator op args
-evaluateFun args (Constructor _ "Array") = case args of
-  [VType typ, VInt i] -> return $ VType $ TArray typ (fromInteger i)
-  _ -> throwError $ InternalError "Array type constructor on wrong types"
+evaluateFun args (Constructor _ "Array") =
+  case args of
+    [VType typ, VInt i] -> return $ VType $ TArray typ (fromInteger i)
+    _ -> throwError $ InternalError "Array type constructor on wrong types"
 evaluateFun args (Constructor _ cons) = return $ VEnum cons [] args
 evaluateFun (arg:ctx) body = withValue arg $ evaluateFun ctx body
 evaluateFun [] body = interpretExpr body
