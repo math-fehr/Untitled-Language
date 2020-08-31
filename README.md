@@ -52,8 +52,8 @@ must have a wildcard (`_`) pattern.
 
 At same time this implies the full power of dependent types at compile time with
 type constructor possible depending on nearly every value type (including `Type`
-obviously). Some restrictions applies. Therefore there a full-blown compile time
-interpreted for all values including type that can be called.
+obviously). Some restrictions applies. Therefore there is need for a full-blown
+compile time interpreter for all compile-time values including types.
 
 ## Linear
 
