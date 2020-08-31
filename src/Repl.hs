@@ -36,7 +36,7 @@ data CmdError
   deriving (Show)
 
 data Command
-  = CmdTopLevel Decl
+  = CmdTopLevel [Decl]
   | CmdExpr Expr
   | CmdError CmdError
   deriving (Show)
@@ -61,16 +61,15 @@ executeCommand (CmdError (CvtError err)) =
   liftIO $ putStrLn $ "Error interpreting expression : " ++ show err
 executeCommand (CmdError (ParseError err)) =
   liftIO $ putStrLn $ "Error parsing command : " ++ show err
-executeCommand (CmdTopLevel decl) =
+executeCommand (CmdTopLevel decls) =
   lift $
-  catchError action (\e -> liftIO $ putStrLn $ "Couldn't define : " ++ show e)
+  catchError (forM_ decls action) (\e -> liftIO $ putStrLn $ "Couldn't define : " ++ show e)
   where
-    name = declName decl
-    action = do
-      Ty.registerDecl decl
-      Ty.declDecl name
-      Ty.defDecl name
-      liftIO $ putStrLn $ "Defined " ++ declName decl
+    action d = do
+      Ty.registerDecl d
+      Ty.declDecl $ declName d
+      Ty.defDecl $ declName d
+      liftIO $ putStrLn $ "Defined " ++ declName d
 executeCommand (CmdExpr expr) =
   lift $
   catchError action (\e -> liftIO $ putStrLn $ "Couldn't evaluate : " ++ show e)
@@ -111,9 +110,8 @@ displayValue (VTuple []) = "()"
 displayValue (VTuple (v1:vs)) =
   "(" ++
   foldl (\str v -> str ++ ", " ++ displayValue v) (displayValue v1) vs ++ ")"
-displayValue (VConstr name value) = name ++ " (" ++ displayValue value ++ ")"
 displayValue (VFun _ i _) = "<lambda#" ++ show i ++ ">"
-displayValue (VForall _ typ _) = "<forall : " ++ displayType typ ++ ">"
+displayValue (VForall _ _ _ _) = "<forall>"
 
 displayField :: (String, Value) -> String
 displayField (name, value) = name ++ " = " ++ displayValue value

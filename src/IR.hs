@@ -44,7 +44,7 @@ data Type
   | TTuple [Type]
   | TArray Type Int
   | TChoice [Type]
-  | TSum [(String, Type)]
+  | TSum [String]
   | TEnum String [Value]
   | TStruct [(String, Type)]
   | TLinArrow Type Type
@@ -88,11 +88,11 @@ data Value
   | VType Type
   | VStruct [(String, Value)]
   | VTuple [Value]
-  | VConstr Int [Value] Value
+  | VEnum String [Value]
   | VFun [Value] Int TExpr
   -- ^ The argument is at De Bruijn index 0 and the context in the list is above 0.
   --   The integer is the number of expected arguments before reduction is possible
-  | VForall [TValue] Type Expr
+  | VForall [TValue] Int Type Expr
   -- ^ Function whose body type depends on the argument.
   deriving (Show, Eq, Ord)
 
@@ -105,6 +105,7 @@ data ExprT typ expr
   = LocalVar (DebugInfo String) Int
   | Def String
   -- ^ Unresolved Definition.
+  | Constructor String
   | Value TValue
   | Let
       { name :: DebugInfo String

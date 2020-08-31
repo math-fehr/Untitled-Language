@@ -453,10 +453,17 @@ registerDecl :: TypingMonad m => Decl -> m ()
 registerDecl decl =
   case decl of
     DDef def -> register (def_name def) decl
-    DEnum name _ constructors -> do
-      register name decl
-      forM_ (fst <$> constructors) $ flip register decl
+    DEnum name _ _ -> register name decl
+    DConstr name _ -> register name decl
     _ -> throwError (InternalError "struct register unimplemented")
+
+declConstructor :: TypingMonad m => Type -> String -> Expr -> Decl -> m Type
+declConstructor enum_type constr_name constr_type _ = do
+  typ <- typeExprAndEval constr_type
+  undefined
+
+declEnum :: TypingMonad m => String -> [(DebugInfo String, Expr)] -> [(String, Expr)] -> m Type
+declEnum name arguments constructors = undefined
 
 -- compute the type of the declaration, potentatially by using other decl or defs.
 declDecl :: TypingMonad m => String -> m Type
@@ -465,9 +472,9 @@ declDecl name =
     DDef DefT {def_name, def_type, def_args, def_body} ->
       typeExprToType def_type
     DEnum e_name e_args e_constructor ->
-      if e_name == name
-        then getTypeFromEnum e_args
-        else throwError (InternalError "constructor decl unimplemented")
+      getTypeFromEnum e_args
+    DConstr name typ ->
+      typeExprToType typ
     _ -> throwError (InternalError "struct decl unimplemented")
 
 desugarDef :: TypingMonad m => Type -> [DebugInfo String] -> Expr -> m Expr
@@ -502,12 +509,12 @@ desugarDef typ l body =
             (Expr SourcePos $
              ForAll h (Expr SourcePos $ Value $ TValue (VType arg) TType) body)
         _ -> throwError DeclarationFunctionTypeArgumentNumberMismatch
-
-desugarEnum :: TypingMonad m => String -> [(DebugInfo String, Expr)] -> m Expr
-desugarEnum e_name [] = return $ Expr SourcePos $ Def e_name
-desugarEnum e_name ((h_name, h):t) = do
-  body <- desugarEnum e_name t
-  return $ Expr SourcePos $ ForAll h_name h body
+  
+countArguments :: Type -> Int
+countArguments (TLinArrow _ t) = 1 + countArguments t
+countArguments (TUnrArrow _ t) = 1 + countArguments t
+countArguments (TForallArrow _ _ t) = 1 + countArguments t
+countArguments _ = 0
 
 -- compute the value of a declaration
 defDecl :: TypingMonad m => String -> m TValue
@@ -518,15 +525,12 @@ defDecl name =
         expr <- desugarDef typ def_args def_body
         texpr <- fst <$> typeExprAndEval expr
         interpret texpr
-      DEnum e_name e_args e_constructors ->
-        if e_name == name
-          then do
-            expr <- desugarEnum e_name e_args
-            --texpr <- typeExpr expr
-            --interpret texpr
-            stat <- globalStatus "boolEnum"
-            throwError (InternalError $ show stat)
-          else throwError (InternalError "Constructor decl unimplemented")
+      DEnum enum_name enum_args constructors -> 
+        return $ flip TValue typ $ VForall [] (length enum_args) TType $ Expr SourcePos
+               $ Value $ TValue (VType $ TSum constructors) TType
+      DConstr constr_name constr_type ->
+        return $ flip TValue typ $ VFun [] (countArguments typ)
+               $ TExpr typ $ Constructor constr_name
       _ -> throwError (InternalError "Struct decl unimplemented")
 
 typeVariable :: TypingMonad m => String -> Expr -> Variable -> m Type
@@ -693,7 +697,7 @@ typeAfterCall (TLinArrow arg body) = body
 compType :: Type -> Type
 compType typ = TLinArrow typ $ TLinArrow typ TBool
 
--- | Call typeExpr', and if the resulting expression can be evaluated,
+-- | Call typeExpr, and if the resulting expression can be evaluated,
 -- do it.
 typeExprAndEval :: TypingMonad m => Expr -> m (TExpr, MetaData)
 typeExprAndEval expr = do
@@ -717,9 +721,10 @@ typeExprToType e = do
         "interpreter didn't returned a type when given an expression of type Type"
 
 getTypeFromEnum :: TypingMonad m => [(DebugInfo String, Expr)] -> m Type
-getTypeFromEnum [] = return $ Type True TType
+getTypeFromEnum [] = return TType
 getTypeFromEnum ((_, e):es) = do
   e' <- typeExprToType e
   addUnrestricted "_" e' Nothing
   es' <- getTypeFromEnum es
-  return $ Type True $ TForallArrow (DI "_") e' es'
+  return $ TForallArrow (DI "_") e' es'
+
