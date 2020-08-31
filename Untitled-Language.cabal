@@ -19,7 +19,7 @@ extra-source-files:  CHANGELOG.md
 
 executable Untitled-Language
   main-is:             Main.hs
-  other-modules:       Parser, IR, ParsingToIR, Error, Typing, Utils, Interpreter, ULPrelude
+  other-modules:       Parser, IR, ParsingToIR, Error, Typing, Utils, Interpreter, ULPrelude, Repl
   -- other-extensions:
   build-depends:       base >= 4.11 && < 5.0
                      , parsec >= 3.1 && < 4.0
