@@ -464,6 +464,9 @@ declConstructor enum_type constr_name constr_type _ = do
 
 declEnum :: TypingMonad m => String -> [(DebugInfo String, Expr)] -> [(String, Expr)] -> m Type
 declEnum name arguments constructors = undefined
+  
+checkConstrType :: TypingMonad m => Type -> m Type
+checkConstrType = undefined
 
 -- compute the type of the declaration, potentatially by using other decl or defs.
 declDecl :: TypingMonad m => String -> m Type
@@ -473,8 +476,10 @@ declDecl name =
       typeExprToType def_type
     DEnum e_name e_args e_constructor ->
       getTypeFromEnum e_args
-    DConstr name typ ->
-      typeExprToType typ
+    DConstr name typ -> do
+      nt <- typeExprToType typ
+      checkConstrType nt
+      return nt
     _ -> throwError (InternalError "struct decl unimplemented")
 
 desugarDef :: TypingMonad m => Type -> [DebugInfo String] -> Expr -> m Expr
@@ -527,7 +532,7 @@ defDecl name =
         interpret texpr
       DEnum enum_name enum_args constructors -> 
         return $ flip TValue typ $ VForall [] (length enum_args) TType $ Expr SourcePos
-               $ Value $ TValue (VType $ TSum constructors) TType
+               $ Value $ TValue (VType $ TSum [] constructors) TType
       DConstr constr_name constr_type ->
         return $ flip TValue typ $ VFun [] (countArguments typ)
                $ TExpr typ $ Constructor constr_name
@@ -718,7 +723,7 @@ typeExprToType e = do
     _ ->
       throwError $
       InternalError
-        "interpreter didn't returned a type when given an expression of type Type"
+        "interpreter didn't return a type when given an expression of type Type"
 
 getTypeFromEnum :: TypingMonad m => [(DebugInfo String, Expr)] -> m Type
 getTypeFromEnum [] = return TType

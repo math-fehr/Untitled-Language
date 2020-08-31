@@ -44,8 +44,7 @@ data Type
   | TTuple [Type]
   | TArray Type Int
   | TChoice [Type]
-  | TSum [String]
-  | TEnum String [Value]
+  | TSum [Value] [String]
   | TStruct [(String, Type)]
   | TLinArrow Type Type
   | TUnrArrow Type Type
@@ -56,7 +55,7 @@ data Type
   deriving (Show, Eq, Ord)
 
 void :: Type
-void = TSum []
+void = TSum [] []
 
 unit :: Type
 unit = TTuple []
@@ -88,7 +87,7 @@ data Value
   | VType Type
   | VStruct [(String, Value)]
   | VTuple [Value]
-  | VEnum String [Value]
+  | VEnum String [Value] [Value]
   | VFun [Value] Int TExpr
   -- ^ The argument is at De Bruijn index 0 and the context in the list is above 0.
   --   The integer is the number of expected arguments before reduction is possible
@@ -171,6 +170,7 @@ declName :: DeclT typ expr -> String
 declName (DDef DefT {def_name}) = def_name
 declName DEnum {ename} = ename
 declName DStruct {sname} = sname
+declName (DConstr name _) = name
 
 type Decl = DeclT Expr Expr
 
