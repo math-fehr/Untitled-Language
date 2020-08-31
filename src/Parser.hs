@@ -24,6 +24,7 @@ data BinOp
   | BLteq
   | BGt
   | BGteq
+  | BIndex
   deriving (Ord, Show, Eq)
 
 str2binOp :: String -> BinOp
@@ -39,6 +40,7 @@ str2binOp ">" = BGt
 str2binOp ">=" = BGteq
 str2binOp "<" = BLt
 str2binOp "<=" = BLteq
+str2binOp "[]" = BIndex
 
 data ManyOp
   = MAmpersand
@@ -224,6 +226,13 @@ builtinManyOp op = do
             | mop == currentmo -> ManyOp currentmo (es ++ [y])
           _ -> ManyOp currentmo [x, y]
 
+builtinAccess :: Parser (Expr -> Expr)
+builtinAccess = do
+  reservedOp "["
+  index <- exprParser
+  reservedOp "]"
+  return $ BinOp BIndex index
+
 forallParser :: Parser (Expr -> Expr)
 forallParser = do
   reserved "forall"
@@ -232,7 +241,8 @@ forallParser = do
   return $ Forall name typ
 
 operatorsList =
-  [ [Infix (builtinBinOp "*") AssocLeft, Infix (builtinBinOp "/") AssocLeft]
+  [ [Postfix builtinAccess]
+  , [Infix (builtinBinOp "*") AssocLeft, Infix (builtinBinOp "/") AssocLeft]
   , [Infix (builtinBinOp "+") AssocLeft, Infix (builtinBinOp "-") AssocLeft]
   , [Prefix forallParser]
   , [Infix (builtinBinOp "->") AssocRight, Infix (builtinBinOp "-@") AssocRight]

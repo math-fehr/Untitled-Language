@@ -207,6 +207,12 @@ callFun (VFun context arity (TExpr typ body)) arg =
     else if arity > 1
            then return $ VFun (arg : context) (arity - 1) $ TExpr typ body
            else evaluateFun (reverse $ arg : context) body
+callFun (VOperator context arity op) arg =
+  if arity < 1
+    then throwError $ TypeSystemUnsound "Too many arguments"
+    else if arity > 1
+           then return $ VOperator (arg : context) (arity - 1) op
+           else evaluateOperator op (reverse $ arg : context)
 callFun _ _ =
   throwError $ TypeSystemUnsound "Calling something that is not a function !"
 
@@ -232,6 +238,7 @@ makeOperatorClosure tp Bar = unOp tp Bar
 makeOperatorClosure tp Array = unOp tp Array
 makeOperatorClosure tp Arrow = binOp tp Arrow
 makeOperatorClosure tp LinArrow = binOp tp LinArrow
+makeOperatorClosure tp Index = binOp tp Index
 
 binOp :: Type -> Operator -> Value
 binOp tp op = VFun [] 2 $ TExpr tp $ Operator op
@@ -292,6 +299,13 @@ evaluateOperator LinArrow _ =
 evaluateOperator Array [VTuple list] = return $ VArray list
 evaluateOperator Array _ =
   throwError $ TypeSystemUnsound "Invalid array arguments"
+evaluateOperator Index [VInt i, VTuple list] = return $ list !! fromInteger i
+evaluateOperator Index [VInt i, VArray list] =
+  if fromInteger i < length list
+    then return $ list !! fromInteger i
+    else throwError $ IndexingError "Out of bound access on array"
+evaluateOperator Index _ =
+  throwError $ TypeSystemUnsound "Invalid indexing arguments"
 
 extractVInt :: InterpreterMonad m => String -> Value -> m Integer
 extractVInt _ (VInt i) = return i

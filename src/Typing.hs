@@ -27,7 +27,7 @@ import Data.Vector (Vector)
 import qualified Data.Vector as V
 import Error
 import IR
-import ULPrelude (prelude)
+import ULPrelude (intt, prelude)
 
 -- import Interpreter hiding (UndefinedVariable, interpret)
 import qualified Interpreter
@@ -583,6 +583,29 @@ typeExpr (Expr _ (Call (Expr _ (Operator Gt)) arg)) = typeCallOp Gt arg
 typeExpr (Expr _ (Call (Expr _ (Operator Lt)) arg)) = typeCallOp Lt arg
 typeExpr (Expr _ (Call (Expr _ (Operator Lteq)) arg)) = typeCallOp Lteq arg
 typeExpr (Expr _ (Call (Expr _ (Operator Array)) arg)) = typeCallOp Array arg
+typeExpr (Expr _ (Call (Expr _ (Call (Expr _ (Operator Index)) index)) obj)) = do
+  (teobj@(TExpr tobj vobj), mtdt) <- typeExpr obj
+  case tobj of
+    ttuple@(TTuple typs) -> do
+      let n = length typs
+      val_index <- typeExprAndInterpret index
+      case val_index of
+        TValue (VInt i) _ ->
+          if fromInteger i < n
+            then do
+              let typ = typs !! fromInteger i
+              let partial_index =
+                    TExpr (TLinArrow ttuple typ) $ Value $
+                    TValue (VOperator [VInt i] 1 Index) (TLinArrow ttuple typ)
+              return $ (, mtdt) $ TExpr typ $ Call partial_index teobj
+            else throwError $ IndexingError "Out of bound tuple indexing"
+        _ -> throwError $ IndexingError "Trying to index a tuple with a non-int"
+    tarr@(TArray typ num) -> do
+      (teind@(TExpr tind vind), mtdtind) <- typeExpr index
+      let op = TExpr (TLinArrow intt (TLinArrow tarr typ)) $ Operator Index
+      let partial_index = TExpr (TLinArrow tarr typ) (Call op teind)
+      return $ (, mtdt <> mtdtind) $ TExpr typ (Call partial_index teobj)
+    t -> throwError $ IndexingError ("Can't index in type " ++ show t)
 typeExpr (Expr _ (Call funE argE)) = do
   (tefun@(TExpr tfun _), fun_mtdt) <- typeExpr funE
   let called_mtdt = fun_mtdt & mtdt_interp %~ (\x -> x - 1)
@@ -696,7 +719,12 @@ typeExprAndEval expr = do
       else return typed_expr
   return (result_expr, metadata)
 
-typeExprToType :: TypingMonad m => Expr -> m (Type)
+typeExprAndInterpret :: TypingMonad m => Expr -> m TValue
+typeExprAndInterpret expr = do
+  te <- fst <$> typeExpr expr
+  Typing.interpret te
+
+typeExprToType :: TypingMonad m => Expr -> m Type
 typeExprToType e = do
   te@(TExpr etyp _) <- fst <$> typeExpr e
   when (etyp /= TType) $ throwError $ NotAType e

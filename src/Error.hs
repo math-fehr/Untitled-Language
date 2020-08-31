@@ -30,4 +30,5 @@ data Error
   | NotEnoughArgs
   | TooManyArgs
   | ArrayNotSameType Type Type
+  | IndexingError String
   deriving (Eq, Show)

@@ -99,8 +99,8 @@ displayValue VUnit = "()"
 displayValue (VInt i) = show i
 displayValue (VBool b) =
   if b
-    then "true"
-    else "false"
+    then "True"
+    else "False"
 displayValue (VType typ) = displayType typ
 displayValue (VStruct []) = "{ }"
 displayValue (VStruct (fld1:flds)) =
@@ -133,8 +133,7 @@ displayType (TTuple []) = "(&)"
 displayType (TTuple (t1:ts)) =
   "(" ++
   foldl (\str t -> str ++ " & " ++ displayType t) (displayType t1) ts ++ ")"
-displayType (TArray t size) =
-  "Array (" ++ displayType t ++ ") " ++ show size
+displayType (TArray t size) = "Array (" ++ displayType t ++ ") " ++ show size
 displayType (TChoice []) = "(^)"
 displayType (TChoice (t1:ts)) =
   "(" ++

@@ -44,6 +44,7 @@ binOpBuiltins =
     , (BGteq, IR.Gteq)
     , (BLt, IR.Lt)
     , (BLteq, IR.Lteq)
+    , (BIndex, IR.Index)
     ]
 
 -- Manyary operations

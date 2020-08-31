@@ -17,8 +17,11 @@ boolt = TBool
 bool :: TValue
 bool = typ2val TBool
 
+intt :: Type
+intt = TInt $ IntType 32 True False
+
 int :: TValue
-int = typ2val $ TInt $ IntType 32 True False
+int = typ2val intt
 
 true :: TValue
 true = TValue (VBool True) boolt

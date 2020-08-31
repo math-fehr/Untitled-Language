@@ -77,6 +77,7 @@ data Operator
   | Gteq
   | Lteq
   | Array
+  | Index
   deriving (Show, Eq, Ord)
 
 -- | Type for concrete comptime values in the interpreter
@@ -90,6 +91,7 @@ data Value
   | VTuple [Value]
   | VArray [Value]
   | VConstr String Value
+  | VOperator [Value] Int Operator
   | VFun [Value] Int TExpr
   -- ^ The argument is at De Bruijn index 0 and the context in the list is above 0.
   --   The integer is the number of expected arguments before reduction is possible
