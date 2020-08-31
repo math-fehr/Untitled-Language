@@ -91,7 +91,7 @@ On hindsight, this system is insufficient to handle all the use cases we thought
 of, so we'll have to change it quite massively for it to be usable in the real
 world. In particular, we'll move to include the linearity inside the types.
 
-## Monads
+## Monads (Not yet implemented)
 
 Linear types are not sufficient to implement actual side-effect on the external
 world like printing on `stdout` or reading from `stdin`. In order to do that, we
@@ -249,7 +249,43 @@ fun arg => body
 
 ### Enumeration
 
-TODO
+The syntax for enumerations is:
+
+```
+enum optionInt : Type
+def := { Some : (Int -@ optionInt) | None : optionInt }
+```
+
+They can be pattern-matched on with the syntax:
+
+```
+match Some 0 with
+| Some a => a
+| None => 12
+end
+```
+
+We plan to add type arguments on enumerations, with the following syntax:
+```
+enum option : Type -> Type
+def A := { Some : (Int -@ option A) | None : Option A}
+```
+
+with the following pattern-match syntax:
+```
+match Some Int 0 with
+| Some a => a
+| None => 23
+end
+```
+
+Note that we also aim to infer when possible the type arguments, so we could write:
+```
+match Some 0 with 
+| Some a => a
+| None => 23
+end
+```
 
 ## Examples
 
