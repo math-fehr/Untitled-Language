@@ -71,6 +71,19 @@ addLocalVar str = pirctx_local %~ (str :)
 ttypeExpr :: IR.Expr
 ttypeExpr = IR.Expr SourcePos $ Def "Type"
 
+matchCaseToIr :: (String, [String], Parser.Expr) -> PIRContext -> Either Error (String, [DebugInfo String], IR.Expr)
+matchCaseToIr (constr, args, e) ctx = do
+  let ctx' = foldl (flip addLocalVar) ctx args
+  let args' = DI <$> args
+  e' <- exprToIr e ctx'
+  return $ (constr, args', e')
+
+matchToIr :: Parser.Expr -> [(String, [String], Parser.Expr)] -> PIRContext -> Either Error IR.Expr
+matchToIr e cases ctx = do
+  e' <- exprToIr e ctx
+  cases' <- forM cases (flip matchCaseToIr ctx)
+  return $ Expr SourcePos $ IR.Match e' cases'
+
 -- Transform a parsed expression to an IR expression
 exprToIr :: Parser.Expr -> PIRContext -> Either Error IR.Expr
 exprToIr EType _ = return ttypeExpr
@@ -119,6 +132,7 @@ exprToIr (Parser.IfThenElse cond e1 e2) ctx = do
   e1' <- exprToIr e1 ctx
   e2' <- exprToIr e2 ctx
   return $ Expr SourcePos $ IR.IfThenElse cond' e1' e2'
+exprToIr (Parser.Match e cases) ctx = matchToIr e cases ctx
 exprToIr (Parser.Lambda name arg body) ctx = do
   arg' <- exprToIr arg ctx
   body' <- exprToIr body (addLocalVar name ctx)

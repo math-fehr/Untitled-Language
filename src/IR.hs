@@ -120,6 +120,7 @@ data ExprT typ expr
       , body :: expr
       }
   | IfThenElse expr expr expr
+  | Match expr [(String, [DebugInfo String], expr)]
   | Call expr expr
     -- ^ Many Op are called on a big tuple
   | Operator Operator
