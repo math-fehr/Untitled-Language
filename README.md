@@ -118,7 +118,7 @@ do `stack init` then `stack run Untitled-Language` (the language was still named
 ## With Nix
 
 You can build and run the REPL using
-[https://nixos.wiki/wiki/Flakes](nix flakes). To do so, you need to
+[nix flakes](https://nixos.wiki/wiki/Flakes). To do so, you need to
 ensure that your version of Nix support flakes, and run the following
 :
 
