@@ -645,7 +645,7 @@ typeCallOp op arg = do
           TInt intType ->
             let funType = binopType (TInt intType)
              in return $ (, mtdt) $ TExpr (typeAfterCall funType) $
-                Call (TExpr funType (Operator Plus)) tearg
+                Call (TExpr funType (Operator op)) tearg
           _ -> throwError (ExpectedIntType arg targ)
     _
       | op == Eq || op == Neq ->
