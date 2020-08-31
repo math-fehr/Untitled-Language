@@ -18,7 +18,7 @@ data Error
   | LinearUseIllegal String Expr
   | TypingCycle -- There is an unsolvable cyclic dependency for typing TODO: Print the cycle
   | InternalError String
-  | NotAnArrow TypeBase -- The type is not an arrow
+  | NotAnArrow Type -- The type is not an arrow
   | DeclarationTypeIsNotAType
   | DeclarationFunctionTypeArgumentNumberMismatch
   | NotYetTyped Variable

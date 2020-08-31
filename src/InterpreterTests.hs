@@ -36,70 +36,67 @@ interpret expr = rinter $ interpretTExpr expr
     rinter :: ConcreteInterpreterMonad a -> Either Error a
     rinter = runInterpreter (GlobalContext M.empty M.empty)
 
-deftyp :: Type
-deftyp = Type True TType
-
 mkint :: Integer -> TExpr
-mkint x = TExpr deftyp (Value (TValue (VInt x) deftyp))
+mkint x = TExpr TType (Value (TValue (VInt x) TType))
 
 ast_tests_data :: [(TExpr, Value)]
 ast_tests_data =
   [ ( TExpr
-        deftyp
+        TType
         (Call
-           (TExpr deftyp (Call (TExpr deftyp (Operator Minus)) (mkint 2)))
+           (TExpr TType (Call (TExpr TType (Operator Minus)) (mkint 2)))
            (mkint 3))
     , VInt (-1))
   , ( TExpr
-        deftyp
+        TType
         (Let
            (DI "x")
            (mkint 2)
            Nothing
            (TExpr
-              deftyp
+              TType
               (Call
                  (TExpr
-                    deftyp
+                    TType
                     (Call
-                       (TExpr deftyp (Operator Minus))
-                       (TExpr deftyp (LocalVar (DI "x") 0))))
+                       (TExpr TType (Operator Minus))
+                       (TExpr TType (LocalVar (DI "x") 0))))
                  (mkint 3))))
     , VInt (-1))
   , ( let lambda =
             TExpr
-              deftyp
+              TType
               (Lambda
                  (DI "x")
                  True
-                 deftyp
+                 TType
                  (TExpr
-                    deftyp
+                    TType
                     (Lambda
                        (DI "y")
                        True
-                       deftyp
+                       TType
                        (TExpr
-                          deftyp
+                          TType
                           (Call
                              (TExpr
-                                deftyp
+                                TType
                                 (Call
-                                   (TExpr deftyp (Operator Minus))
-                                   (TExpr deftyp (LocalVar (DI "y") 0))))
-                             (TExpr deftyp (LocalVar (DI "x") 1)))))))
+                                   (TExpr TType (Operator Minus))
+                                   (TExpr TType (LocalVar (DI "y") 0))))
+                             (TExpr TType (LocalVar (DI "x") 1)))))))
        in TExpr
-            deftyp
+            TType
             (Let
                (DI "f")
                lambda
                Nothing
                (TExpr
-                  deftyp
+                  TType
                   (Call
                      (TExpr
-                        deftyp
-                        (Call (TExpr deftyp (LocalVar (DI "f") 0)) (mkint 2)))
+                        TType
+                        (Call (TExpr TType (LocalVar (DI "f") 0)) (mkint 2)))
                      (mkint 3))))
     , VInt 1)
   ]
@@ -120,7 +117,7 @@ interpreter_file_tests =
   forM file_tests_data (uncurry file_make_test) >>= return . testGroup "File"
 
 mockTyper :: Expr -> TExpr
-mockTyper (Expr _ expr) = TExpr deftyp $ mockTyperT expr
+mockTyper (Expr _ expr) = TExpr TType $ mockTyperT expr
 
 mockTyperT :: ExprT Expr Expr -> ExprT Type TExpr
 mockTyperT (LocalVar name id) = LocalVar name id
@@ -143,8 +140,8 @@ mockTypeFile prog =
   foldr
     addGlobal
     (M.fromList
-       [ ("true", TValue (VBool True) (Type True TType))
-       , ("false", TValue (VBool False) (Type True TType))
+       [ ("true", TValue (VBool True) TType)
+       , ("false", TValue (VBool False) TType)
        ]) $
   prog_defs defs
   where
@@ -152,7 +149,7 @@ mockTypeFile prog =
     addGlobal (DDef (DefT name _ args body)) globals =
       M.insert
         name
-        (TValue (VFun [] (length args) $ mockTyper body) (Type True TType))
+        (TValue (VFun [] (length args) $ mockTyper body) TType)
         globals
     addGlobal _ globals = globals
     defs :: Program

@@ -33,7 +33,7 @@ data Variable
   deriving (Eq, Ord, Show)
 
 -- | The *concrete* values for types.
-data TypeBase
+data Type
   = TVar (DebugInfo String) Int
   -- ^ Type variable bounded by a Forall (de Bruijn)
   | TBool
@@ -54,18 +54,11 @@ data TypeBase
   --   The arguments must have an equality. For now only bool, int and type are supported
   deriving (Show, Eq, Ord)
 
-data Type =
-  Type
-    { comptime :: Bool
-    , base :: TypeBase
-    }
-  deriving (Show, Eq, Ord)
-
 void :: Type
-void = Type {comptime = True, base = TSum []}
+void = TSum []
 
 unit :: Type
-unit = Type {comptime = True, base = TTuple []}
+unit = TTuple []
 
 data Operator
   = Plus

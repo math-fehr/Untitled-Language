@@ -20,6 +20,7 @@ import Data.Foldable
 import qualified Data.List as L
 import Data.Map (Map)
 import qualified Data.Map as M
+import Data.Semigroup
 import Data.Set (Set)
 import qualified Data.Set as S
 import Data.Vector (Vector)
@@ -43,6 +44,28 @@ import qualified Interpreter
 --   / _ \| '_ (_-<  _| '_/ _` / _|  _|
 --  /_/ \_\_.__/__/\__|_| \__,_\__|\__|
 --
+data MetaData =
+  MtDt
+    { _mtdt_comptime :: Bool
+    , _mtdt_interp :: Int
+    }
+  deriving (Eq, Show, Ord)
+
+makeLenses ''MetaData
+
+instance Semigroup MetaData where
+  (MtDt comp1 interp1) <> (MtDt comp2 interp2) =
+    MtDt (comp1 && comp2) (max interp1 interp2)
+
+defMtdt = MtDt True (-1)
+
+data MetaType =
+  MtType
+    { _mtype_data :: MetaData
+    , _mtype_type :: Type
+    }
+  deriving (Eq, Show, Ord)
+
 -- | Status of individual linear variable during typing
 data VarStatus
   = Unrestricted
@@ -445,7 +468,7 @@ desugarDef typ l body =
   case l of
     [] -> return body
     h:t ->
-      case base typ of
+      case typ of
         TLinArrow arg tbody -> do
           body <- desugarDef tbody t body
           return
@@ -453,8 +476,7 @@ desugarDef typ l body =
              Lambda
                { name = h
                , linear = True
-               , argtyp =
-                   Expr SourcePos $ Value $ TValue (VType arg) $ Type True TType
+               , argtyp = Expr SourcePos $ Value $ TValue (VType arg) TType
                , body
                })
         TUnrArrow arg tbody -> do
@@ -464,18 +486,14 @@ desugarDef typ l body =
              Lambda
                { name = h
                , linear = False
-               , argtyp =
-                   Expr SourcePos $ Value $ TValue (VType arg) $ Type True TType
+               , argtyp = Expr SourcePos $ Value $ TValue (VType arg) TType
                , body
                })
         TForallArrow argname arg tbody -> do
           body <- desugarDef tbody t body
           return
             (Expr SourcePos $
-             ForAll
-               h
-               (Expr SourcePos $ Value $ TValue (VType arg) $ Type True TType)
-               body)
+             ForAll h (Expr SourcePos $ Value $ TValue (VType arg) TType) body)
         _ -> throwError DeclarationFunctionTypeArgumentNumberMismatch
 
 -- compute the value of a declaration
@@ -485,7 +503,7 @@ defDecl name =
     case decl of
       DDef DefT {def_name, def_type, def_args, def_body} -> do
         expr <- desugarDef typ def_args def_body
-        texpr <- typeExpr expr
+        texpr <- fst <$> typeExprAndEval expr
         interpret texpr
       _ -> throwError (InternalError "Enum and struct decl unimplemented")
 
@@ -500,94 +518,89 @@ typeVariable name e var = do
 
 expectType :: TypingMonad m => Type -> Expr -> Type -> m ()
 expectType expected_type expr actual_type =
-  case (expected_type, actual_type) of
-    (Type True etyp, Type True atyp) -> when (etyp /= atyp) fail
-    (Type False etyp, Type _ atyp) -> when (etyp /= atyp) fail
-    _ -> fail
-  where
-    fail = throwError $ ExpectedType expr expected_type actual_type
+  when (expected_type /= actual_type) $ throwError $
+  ExpectedType expr expected_type actual_type
 
 mergeType :: TypingMonad m => Type -> Type -> m Type
-mergeType t@(Type comptime base) t'@(Type comptime' base') = do
-  when (base /= base') $ throwError $ IncompatibleTypes t t'
-  return (Type (comptime && comptime') base)
+mergeType t t' = do
+  when (t /= t') $ throwError $ IncompatibleTypes t t'
+  return t
 
-typeExpr :: TypingMonad m => Expr -> m TExpr
-typeExpr e = do
-  te@(TExpr (Type comptime typ) e') <- typeExpr' e
-  if comptime
-    then do
-      v <- interpret te
-      return $ TExpr (Type True typ) (Value v)
-    else return te
+extractVal :: TValue -> Value
+extractVal (TValue val _) = val
 
-typeExpr' :: TypingMonad m => Expr -> m TExpr
-typeExpr' e@(Expr _ (LocalVar (DI name) id)) =
-  TExpr <$> (typeVariable name e $ DeBruijn id) <*>
-  (return $ LocalVar (DI name) id)
-typeExpr' e@(Expr _ (Def def)) =
-  TExpr <$> (typeVariable def e $ Global def) <*> (return (Def def))
-typeExpr' (Expr _ (Value (TValue val typ))) =
-  return $ TExpr typ (Value (TValue val typ))
-typeExpr' (Expr _ (Let (DI name) val valtyp body)) = do
-  teval@(TExpr tval@(Type comptime _) _) <- typeExpr val
+typeExpr :: TypingMonad m => Expr -> m (TExpr, MetaData)
+typeExpr e@(Expr _ (LocalVar (DI name) id)) =
+  (, defMtdt & mtdt_interp .~ id) <$> texpr
+  where
+    texpr =
+      TExpr <$> (typeVariable name e $ DeBruijn id) <*>
+      (return $ LocalVar (DI name) id)
+typeExpr e@(Expr _ (Def def)) = (, defMtdt) <$> texpr
+  where
+    texpr = TExpr <$> (typeVariable def e $ Global def) <*> (return (Def def))
+typeExpr (Expr _ (Value (TValue val typ))) =
+  return $ (TExpr typ (Value (TValue val typ)), defMtdt)
+typeExpr (Expr _ (Let (DI name) var vartyp body)) = do
+  (tevar@(TExpr tvar _), mtdt) <- typeExprAndEval var
   typ <-
-    case valtyp of
-      Just valtyp -> do
-        tvaltyp <- typeExprToType valtyp
-        expectType tvaltyp val tval
-      -- when (tvaltyp /= tval) $ throwError $ ExpectedType val tvaltyp tval
-        return tvaltyp
-      _ -> return tval
-  if comptime
-    then do
-      (TValue vval _) <- interpret teval
-      addLinear name tval (Just vval)
-    else addLinear name tval Nothing
-  tebody@(TExpr tbody _) <- typeExpr body
+    case vartyp of
+      Just vartyp -> do
+        tvartyp <- typeExprToType vartyp
+        expectType tvartyp var tvar
+        return tvartyp
+      _ -> return tvar
+  vval <-
+    if mtdt ^. mtdt_interp < 0
+      then Just <$> extractVal <$> interpret tevar
+      else return Nothing
+  (tebody@(TExpr tbody _), body_mtdt) <- typeExpr body
   leaveScope
-  return $ TExpr tbody $ Let (DI name) teval (Just typ) tebody
-typeExpr' (Expr _ (IfThenElse cond thenE elseE)) = do
-  tecond@(TExpr ctyp _) <- typeExpr cond
-  expectType (Type False TBool) cond ctyp
-  (tethen@(TExpr then_type _), then_free_vars) <-
+  return $
+    ( TExpr tbody $ Let (DI name) tevar (Just typ) tebody
+    , body_mtdt & mtdt_interp %~ (\x -> x - 1))
+typeExpr (Expr _ (IfThenElse cond thenE elseE)) = do
+  (tecond@(TExpr ctyp _), cond_mtdt) <- typeExpr cond
+  expectType TBool cond ctyp
+  ((tethen@(TExpr then_type _), then_mtdt), then_free_vars) <-
     saveState $ (,) <$> typeExpr thenE <*> freeVariables
-  (teelse@(TExpr else_type _), else_free_vars) <-
-    saveState $ (,) <$> typeExpr elseE <*> freeVariables
+  ((teelse@(TExpr else_type _), else_mtdt), else_free_vars) <-
+    (,) <$> typeExpr elseE <*> freeVariables
   when (then_free_vars /= else_free_vars) $ throwError $
     DifferringRessources thenE elseE
-  Type common_comptime common_type <- mergeType then_type else_type
-  let Type cond_comptime _ = ctyp
-  let restyp = Type (common_comptime && cond_comptime) common_type
-  return $ TExpr restyp $ IfThenElse tecond tethen teelse
-typeExpr' (Expr _ (Call (Expr _ (Operator Plus)) arg)) = typeCallOp Plus arg
-typeExpr' (Expr _ (Call (Expr _ (Operator Minus)) arg)) = typeCallOp Minus arg
-typeExpr' (Expr _ (Call (Expr _ (Operator Times)) arg)) = typeCallOp Times arg
-typeExpr' (Expr _ (Call (Expr _ (Operator Div)) arg)) = typeCallOp Div arg
-typeExpr' (Expr _ (Call (Expr _ (Operator Eq)) arg)) = typeCallOp Eq arg
-typeExpr' (Expr _ (Call (Expr _ (Operator Neq)) arg)) = typeCallOp Neq arg
-typeExpr' (Expr _ (Call (Expr _ (Operator Gteq)) arg)) = typeCallOp Gteq arg
-typeExpr' (Expr _ (Call (Expr _ (Operator Gt)) arg)) = typeCallOp Gt arg
-typeExpr' (Expr _ (Call (Expr _ (Operator Lt)) arg)) = typeCallOp Lt arg
-typeExpr' (Expr _ (Call (Expr _ (Operator Lteq)) arg)) = typeCallOp Lteq arg
-typeExpr' (Expr _ (Call funE argE)) = do
-  tefun@(TExpr (Type ctfun tfun) _) <- typeExpr funE
+  expectType then_type elseE else_type
+  return $
+    ( TExpr then_type $ IfThenElse tecond tethen teelse
+    , cond_mtdt <> then_mtdt <> else_mtdt)
+typeExpr (Expr _ (Call (Expr _ (Operator Plus)) arg)) = typeCallOp Plus arg
+typeExpr (Expr _ (Call (Expr _ (Operator Minus)) arg)) = typeCallOp Minus arg
+typeExpr (Expr _ (Call (Expr _ (Operator Times)) arg)) = typeCallOp Times arg
+typeExpr (Expr _ (Call (Expr _ (Operator Div)) arg)) = typeCallOp Div arg
+typeExpr (Expr _ (Call (Expr _ (Operator Eq)) arg)) = typeCallOp Eq arg
+typeExpr (Expr _ (Call (Expr _ (Operator Neq)) arg)) = typeCallOp Neq arg
+typeExpr (Expr _ (Call (Expr _ (Operator Gteq)) arg)) = typeCallOp Gteq arg
+typeExpr (Expr _ (Call (Expr _ (Operator Gt)) arg)) = typeCallOp Gt arg
+typeExpr (Expr _ (Call (Expr _ (Operator Lt)) arg)) = typeCallOp Lt arg
+typeExpr (Expr _ (Call (Expr _ (Operator Lteq)) arg)) = typeCallOp Lteq arg
+typeExpr (Expr _ (Call funE argE)) = do
+  (tefun@(TExpr tfun _), fun_mtdt) <- typeExpr funE
+  let called_mtdt = fun_mtdt & mtdt_interp %~ (\x -> x - 1)
   case tfun of
-    TLinArrow expectedArgT (Type ctbody tbody) -> do
-      tearg@(TExpr targ _) <- typeExpr argE
+    TLinArrow expectedArgT tbody -> do
+      (tearg@(TExpr targ _), arg_mtdt) <- typeExpr argE
       expectType expectedArgT argE targ
-      return $ TExpr (Type (ctbody && ctfun) tbody) $ Call tefun tearg
-    TUnrArrow expectedArgT (Type ctbody tbody) -> do
-      tearg@(TExpr targ _) <- hideLinear $ typeExpr argE
+      return $ (TExpr tbody $ Call tefun tearg, called_mtdt <> arg_mtdt)
+    TUnrArrow expectedArgT tbody -> do
+      (tearg@(TExpr targ _), arg_mtdt) <- hideLinear $ typeExpr argE
       expectType expectedArgT argE targ
-      return $ TExpr (Type (ctbody && ctfun) tbody) $ Call tefun tearg
+      return $ (TExpr tbody $ Call tefun tearg, called_mtdt <> arg_mtdt)
     _ -> throwError $ NotAnArrow tfun
-typeExpr' (Expr _ (Tuple es)) = do
+typeExpr (Expr _ (Tuple es)) = do
   tees <- mapM typeExpr es
-  let comptime = all (\(TExpr (Type b _) _) -> b) tees
-  let typs = (\(TExpr typ _) -> typ) <$> tees
-  return $ TExpr (Type comptime $ TTuple typs) $ (Tuple tees)
-typeExpr' (Expr _ (Lambda (DI name) linear typ body)) = do
+  let typs = fmap (\(TExpr typ _, _) -> typ) tees
+  let mtdt = foldr (<>) defMtdt $ fmap snd tees
+  return $ (, mtdt) $ TExpr (TTuple typs) $ Tuple $ fmap fst tees
+typeExpr (Expr _ (Lambda (DI name) linear typ body)) = do
   typ <- typeExprToType typ
   (if linear
      then addLinear
@@ -595,85 +608,83 @@ typeExpr' (Expr _ (Lambda (DI name) linear typ body)) = do
     name
     typ
     Nothing
-  tebody@(TExpr tbody _) <- typeExpr body
+  (tebody@(TExpr tbody _), body_mtdt) <- typeExpr body
   _ <- leaveScope
-  return $
+  let result_mtdt = body_mtdt & mtdt_interp %~ (\x -> x - 1)
+  return $ (, result_mtdt) $
     TExpr
-      (Type
-         True
-         ((if linear
-             then TLinArrow
-             else TUnrArrow)
-            typ
-            tbody)) $
+      ((if linear
+          then TLinArrow
+          else TUnrArrow)
+         typ
+         tbody) $
     Lambda (DI name) linear typ tebody
-typeExpr' (Expr _ (ForAll (DI name) typ expr)) = do
+typeExpr (Expr _ (ForAll (DI name) typ expr)) = do
   typ' <- typeExprToType typ
   addUnrestricted name typ' Nothing
   expr' <- typeExprToType expr
   _ <- leaveScope
-  return $ TExpr (Type True TType) $ Value $
-    TValue (VType $ Type True $ TForallArrow (DI name) typ' expr') $
-    Type True TType
-typeExpr' (Expr _ (Operator Arrow)) =
-  let ttype = Type True TType
-      arrowtype = TUnrArrow ttype $ Type True $ (TUnrArrow ttype ttype)
-   in return $ TExpr (Type True arrowtype) (Operator Arrow)
-typeExpr' (Expr _ (Operator LinArrow)) =
-  let ttype = Type True TType
-      arrowtype = TUnrArrow ttype $ Type True $ (TUnrArrow ttype ttype)
-   in return $ TExpr (Type True arrowtype) (Operator LinArrow)
-typeExpr' (Expr _ (Operator op)) =
-  throwError (InternalError $ "Operator" ++ show op ++ "unimplemented")
+  return $ (, defMtdt) $ TExpr TType $ Value $
+    TValue (VType $ TForallArrow (DI name) typ' expr') TType
+typeExpr (Expr _ (Operator Arrow)) =
+  let arrowtype = TUnrArrow TType $ TUnrArrow TType TType
+   in return $ (, defMtdt) $ TExpr arrowtype $ Operator Arrow
+typeExpr (Expr _ (Operator LinArrow)) =
+  let arrowtype = TUnrArrow TType $ TUnrArrow TType TType
+   in return $ (, defMtdt) $ TExpr arrowtype (Operator LinArrow)
+typeExpr (Expr _ (Operator op)) =
+  throwError (InternalError $ "Operator " ++ show op ++ " unimplemented")
 
-typeCallOp :: TypingMonad m => Operator -> Expr -> m TExpr
+typeCallOp :: TypingMonad m => Operator -> Expr -> m (TExpr, MetaData)
 typeCallOp op arg = do
-  tearg@(TExpr targ@(Type ctarg tbarg) varg) <- typeExpr arg
+  (tearg@(TExpr targ varg), mtdt) <- typeExpr arg
   case op of
     _
       | op == Plus || op == Minus || op == Times || op == Div ->
-        case tbarg of
+        case targ of
           TInt intType ->
-            let funType = binopType True (TInt intType)
-             in return $ TExpr (typeAfterCall ctarg funType) $
-                Call (TExpr funType (Operator op)) tearg
+            let funType = binopType (TInt intType)
+             in return $ (, mtdt) $ TExpr (typeAfterCall funType) $
+                Call (TExpr funType (Operator Plus)) tearg
           _ -> throwError (ExpectedIntType arg targ)
     _
-      | op == Eq || op == Neq  ->
-        return $ TExpr typafter $ Call (TExpr funType (Operator op)) tearg
-      where funType = compType tbarg
-            typafter = typeAfterCall ctarg funType
-    _ | op == Gt || op == Lt || op == Gteq || op == Lteq ->
-        case tbarg of
+      | op == Eq || op == Neq ->
+        return $ (, mtdt) $ TExpr typafter $
+        Call (TExpr funType (Operator op)) tearg
+      where funType = compType targ
+            typafter = typeAfterCall funType
+    _
+      | op == Gt || op == Lt || op == Gteq || op == Lteq ->
+        case targ of
           TInt intType ->
             let funType = compType (TInt intType)
-             in return $ TExpr (typeAfterCall ctarg funType) $
+             in return $ (, mtdt) $ TExpr (typeAfterCall funType) $
                 Call (TExpr funType (Operator op)) tearg
           _ -> throwError (ExpectedIntType arg targ)
 
-binopType :: Bool -> TypeBase -> Type
-binopType comptime typ =
-  Type
-    comptime
-    (TLinArrow
-       (Type False typ)
-       (Type True $ TLinArrow (Type False typ) (Type False typ)))
+binopType :: Type -> Type
+binopType typ = TLinArrow typ (TLinArrow typ typ)
 
-compType :: TypeBase -> Type
-compType typ =
-  Type
-    True
-    (TLinArrow
-       (Type False typ)
-       (Type True $ TLinArrow (Type False typ) (Type False TBool)))
+typeAfterCall :: Type -> Type
+typeAfterCall (TLinArrow arg body) = body
 
-typeAfterCall :: Bool -> Type -> Type
-typeAfterCall comptime (Type comptimeFun (TLinArrow arg (Type _ body))) =
-  Type (comptime && comptimeFun) body
+compType :: Type -> Type
+compType typ = TLinArrow typ $ TLinArrow typ TBool
+
+-- | Call typeExpr', and if the resulting expression can be evaluated,
+-- do it.
+typeExprAndEval :: TypingMonad m => Expr -> m (TExpr, MetaData)
+typeExprAndEval expr = do
+  (typed_expr@(TExpr typ _), metadata) <- typeExpr expr
+  result_expr <-
+    if metadata ^. mtdt_comptime && metadata ^. mtdt_interp < 0
+      then TExpr typ <$> Value <$> interpret typed_expr
+      else return typed_expr
+  return (result_expr, metadata)
 
 typeExprToType :: TypingMonad m => Expr -> m (Type)
 typeExprToType e = do
-  te@(TExpr (Type _ etyp) _) <- typeExpr e
+  te@(TExpr etyp _) <- fst <$> typeExpr e
   when (etyp /= TType) $ throwError $ NotAType e
   (TValue val _) <- Typing.interpret te
   case val of

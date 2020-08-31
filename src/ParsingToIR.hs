@@ -63,8 +63,7 @@ addLocalVar :: String -> PIRContext -> PIRContext
 addLocalVar str = pirctx_local %~ (str :)
 
 ttypeExpr :: IR.Expr
-ttypeExpr =
-  IR.Expr SourcePos $ Value $ TValue (VType (Type True TType)) $ Type True TType
+ttypeExpr = IR.Expr SourcePos $ Value $ TValue (VType TType) TType
 
 -- Transform a parsed expression to an IR expression
 exprToIr :: Parser.Expr -> PIRContext -> Either Error IR.Expr
@@ -72,8 +71,7 @@ exprToIr EType _ = return ttypeExpr
 exprToIr (Var str) ctx = return $ getExprFromIdent str ctx
 exprToIr (Parser.IntConst i) _ =
   return $
-  Expr SourcePos $
-  Value $ TValue (VInt i) $ Type True $ TInt $ IntType 32 True False
+  Expr SourcePos $ Value $ TValue (VInt i) $ TInt $ IntType 32 True False
 exprToIr (Parser.Let var typ val body) ctx = do
   typ' <- percolateMaybe $ flip exprToIr ctx <$> typ
   val' <- exprToIr val ctx

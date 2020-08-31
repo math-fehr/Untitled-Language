@@ -76,7 +76,7 @@ executeCommand (CmdExpr expr) =
   catchError action (\e -> liftIO $ putStrLn $ "Couldn't evaluate : " ++ show e)
   where
     action = do
-      texpr <- Ty.typeExpr expr
+      texpr <- fst <$> Ty.typeExpr expr
       value <- Ty.interpret texpr
       liftIO $ displayTValue value
 
@@ -88,7 +88,7 @@ executeCommand (CmdExpr expr) =
 --  |_|   |_|  \___|\__|\__|\__, |_|   |_|  |_|_| |_|\__|_|_| |_|\__, |
 --                          |___/                                |___/ 
 displayTValue :: TValue -> IO ()
-displayTValue (TValue value (Type _ typ)) = do
+displayTValue (TValue value typ) = do
   putStr $ displayValue value
   putStr " : "
   putStr $ displayType typ
@@ -101,7 +101,7 @@ displayValue (VBool b) =
   if b
     then "true"
     else "false"
-displayValue (VType (Type _ typ)) = displayType typ
+displayValue (VType typ) = displayType typ
 displayValue (VStruct []) = "{ }"
 displayValue (VStruct (fld1:flds)) =
   "{ " ++
@@ -113,15 +113,12 @@ displayValue (VTuple (v1:vs)) =
   foldl (\str v -> str ++ ", " ++ displayValue v) (displayValue v1) vs ++ ")"
 displayValue (VConstr name value) = name ++ " (" ++ displayValue value ++ ")"
 displayValue (VFun _ i _) = "<lambda#" ++ show i ++ ">"
-displayValue (VForall _ (Type _ typ) _) = "<forall : " ++ displayType typ ++ ">"
+displayValue (VForall _ typ _) = "<forall : " ++ displayType typ ++ ">"
 
 displayField :: (String, Value) -> String
 displayField (name, value) = name ++ " = " ++ displayValue value
 
-unType :: Type -> TypeBase
-unType (Type _ typ) = typ
-
-displayType :: TypeBase -> String
+displayType :: Type -> String
 displayType (TVar (DI name) id) = name ++ "<" ++ show id ++ ">"
 displayType TBool = "Bool"
 displayType TType = "Type"
@@ -130,21 +127,13 @@ displayType TByte = "Byte"
 displayType (TTuple []) = "(&)"
 displayType (TTuple (t1:ts)) =
   "(" ++
-  foldl
-    (\str t -> str ++ " & " ++ displayType t)
-    (displayType $ unType t1)
-    (map unType ts) ++
-  ")"
+  foldl (\str t -> str ++ " & " ++ displayType t) (displayType t1) ts ++ ")"
 displayType (TArray t size) =
-  "Array<" ++ displayType (unType t) ++ "," ++ show size ++ ">"
+  "Array<" ++ displayType t ++ "," ++ show size ++ ">"
 displayType (TChoice []) = "(^)"
 displayType (TChoice (t1:ts)) =
   "(" ++
-  foldl
-    (\str t -> str ++ " ^ " ++ displayType t)
-    (displayType $ unType t1)
-    (map unType ts) ++
-  ")"
+  foldl (\str t -> str ++ " ^ " ++ displayType t) (displayType t1) ts ++ ")"
 displayType (TSum []) = "[|]"
 displayType (TSum (t1:ts)) =
   "[ " ++
@@ -155,36 +144,34 @@ displayType (TStruct (t1:ts)) =
   foldl (\str t -> str ++ " & " ++ displayTName t) (displayTName t1) ts ++ " }"
 displayType (TLinArrow arg ret) =
   if isArrow arg
-    then "(" ++ displayType (unType arg) ++ ") -@ " ++ displayType (unType ret)
-    else displayType (unType arg) ++ " -@ " ++ displayType (unType ret)
+    then "(" ++ displayType arg ++ ") -@ " ++ displayType ret
+    else displayType arg ++ " -@ " ++ displayType ret
 displayType (TUnrArrow arg ret) =
   if isArrow arg
-    then "(" ++ displayType (unType arg) ++ ") -> " ++ displayType (unType ret)
-    else displayType (unType arg) ++ " -> " ++ displayType (unType ret)
+    then "(" ++ displayType arg ++ ") -> " ++ displayType ret
+    else displayType arg ++ " -> " ++ displayType ret
 displayType (TForallArrow (DI name) argt rett) =
-  "forall (" ++
-  name ++
-  " : " ++ displayType (unType argt) ++ "). " ++ displayType (unType rett)
+  "forall (" ++ name ++ " : " ++ displayType argt ++ "). " ++ displayType rett
 displayType (TNewType name [] typ) =
-  "<" ++ name ++ " := " ++ displayType (unType typ) ++ ">"
+  "<" ++ name ++ " := " ++ displayType typ ++ ">"
 displayType (TNewType name (a1:as) typ) =
   "<" ++
   name ++
   " := " ++
   foldl
     (\str (TValue a _) -> str ++ " (" ++ displayValue a ++ ")")
-    ("(" ++ displayType (unType typ) ++ ")")
+    ("(" ++ displayType typ ++ ")")
     as ++
   ">"
 
 isArrow :: Type -> Bool
-isArrow (Type _ (TLinArrow _ _)) = True
-isArrow (Type _ (TUnrArrow _ _)) = True
-isArrow (Type _ (TForallArrow _ _ _)) = True
+isArrow (TLinArrow _ _) = True
+isArrow (TUnrArrow _ _) = True
+isArrow (TForallArrow _ _ _) = True
 isArrow _ = False
 
 displayTName :: (String, Type) -> String
-displayTName (name, Type _ typ) = name ++ " : " ++ displayType typ
+displayTName (name, typ) = name ++ " : " ++ displayType typ
 
 displayIntType :: IntType -> String
 displayIntType (IntType size True True) = "Int" ++ show size

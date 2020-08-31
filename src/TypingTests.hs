@@ -65,6 +65,10 @@ reuseP :: Error -> Bool
 reuseP (ReusedLinear _ _) = True
 reuseP _ = False
 
+unusedP :: Error -> Bool
+unusedP (UnusedLinear _) = True
+unusedP _ = False
+
 typing_monad_tests_data :: TypingMonad m => [TypingMonadTest m]
 typing_monad_tests_data =
   [ TMTestEq "Registering" (Registered d) $
@@ -77,8 +81,8 @@ typing_monad_tests_data =
     register "main" d >> decl "main" (const $ return et) >>
     def "main" (const $ const $ return $ TValue (VInt 42) et) >>
     globalStatus "main"
-  , TMTestEq "Add linear" "x" $ addLinear "x" et Nothing >> leaveScope
-  , TMTestEq "Add unrestricted" "x" $
+  , TMTestFailure "Add linear" unusedP $ addLinear "x" et Nothing >> leaveScope
+  , TMTestEq "Add unrestricted" Unrestricted $
     addUnrestricted "x" et Nothing >> leaveScope
   , TMTestFailure "Use undefined" unknownP $ useVar $ DeBruijn 0
   , TMTestEq "Use" LinearUsed $
@@ -89,8 +93,8 @@ typing_monad_tests_data =
   ]
   where
     d = DDef (DefT "main" (Expr SourcePos $ Value $ TValue (VType et) t) [] e)
-    t = Type True TType
-    et = Type True $ TInt $ IntType 64 False True
+    t = TType
+    et = TInt $ IntType 64 False True
     e = Expr SourcePos $ Value $ TValue (VInt 42) et
 
 typing_monad_tests :: TestTree

@@ -270,23 +270,22 @@ evaluateOperator Lteq _ =
 evaluateOperator Hat [VTuple (VInt start:args)] =
   VInt <$> foldM (\acc v -> xor acc <$> extractVInt "\"^\"" v) start args
 evaluateOperator Hat [VTuple (VType start:args)] =
-  VType <$> uncurry Type <$> extractVTypes "\"^\"" (VType start : args) TChoice
+  VType <$> extractVTypes "\"^\"" (VType start : args) TChoice
 evaluateOperator Hat _ =
   throwError $ TypeSystemUnsound "Invalid \"^\" arguments"
 evaluateOperator Ampersand [VTuple (VInt start:args)] =
   VInt <$> foldM (\acc v -> (acc .&.) <$> extractVInt "\"&\"" v) start args
 evaluateOperator Ampersand [VTuple (VType start:args)] =
-  VType <$> uncurry Type <$> extractVTypes "\"&\"" (VType start : args) TTuple
+  VType <$> extractVTypes "\"&\"" (VType start : args) TTuple
 evaluateOperator Bar [VTuple (VInt start:args)] =
   VInt <$> foldM (\acc v -> (acc .|.) <$> extractVInt "\"&\"" v) start args
 evaluateOperator Bar _ =
   throwError $ TypeSystemUnsound "Invalid \"|\" arguments"
-evaluateOperator Arrow [VType t1, VType t2@(Type comptime _)] =
-  return $ VType $ Type comptime $ TUnrArrow t1 t2
+evaluateOperator Arrow [VType t1, VType t2] = return $ VType $ TUnrArrow t1 t2
 evaluateOperator Arrow _ =
   throwError $ TypeSystemUnsound "Invalid \"->\" arguments"
-evaluateOperator LinArrow [VType t1, VType t2@(Type comptime _)] =
-  return $ VType $ Type comptime $ TLinArrow t1 t2
+evaluateOperator LinArrow [VType t1, VType t2] =
+  return $ VType $ TLinArrow t1 t2
 evaluateOperator LinArrow _ =
   throwError $ TypeSystemUnsound "Invalid \"-@\" arguments"
 
@@ -304,14 +303,12 @@ extractVTypes ::
      forall m. InterpreterMonad m
   => String
   -> [Value]
-  -> ([Type] -> TypeBase)
-  -> m (Bool, TypeBase)
-extractVTypes opname vals f = second f <$> foldM accumulator (True, []) vals
+  -> ([Type] -> Type)
+  -> m Type
+extractVTypes opname vals f = f <$> foldM accumulator [] vals
   where
-    accumulator :: (Bool, [Type]) -> Value -> m (Bool, [Type])
-    accumulator (is_comptime, acc) val =
-      extractVType opname val >>= \(Type cp rt) ->
-        return (cp && is_comptime, Type cp rt : acc)
+    accumulator :: [Type] -> Value -> m [Type]
+    accumulator acc val = extractVType opname val >>= \rt -> return (rt : acc)
 
 findCapturedVariables ::
      forall m. InterpreterMonad m

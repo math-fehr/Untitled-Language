@@ -5,23 +5,20 @@ import qualified Data.Map as M
 
 import IR
 
-comptimetyp :: TypeBase -> Type
-comptimetyp = Type True
-
 typ2val :: Type -> TValue
-typ2val typ = TValue (VType typ) $ comptimetyp TType
+typ2val typ = TValue (VType typ) TType
 
 typ :: TValue
-typ = typ2val $ comptimetyp TType
+typ = typ2val TType
 
 boolt :: Type
-boolt = comptimetyp TBool
+boolt = TBool
 
 bool :: TValue
-bool = typ2val $ Type False TBool
+bool = typ2val TBool
 
 int :: TValue
-int = typ2val $ Type False $ TInt $ IntType 32 True False
+int = typ2val $ TInt $ IntType 32 True False
 
 true :: TValue
 true = TValue (VBool True) boolt
