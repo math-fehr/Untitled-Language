@@ -117,7 +117,8 @@ displayValue (VEnum constr _ (a1 : as)) =
     "[" ++ constr ++ " "
     ++ foldl (\str a -> " (" ++ displayValue a ++ ")")
              ("(" ++ displayValue a1 ++ ")") as
-    ++ "]"
+    ++ "]\
+       \"
 
 displayField :: (String, Value) -> String
 displayField (name, value) = name ++ " = " ++ displayValue value

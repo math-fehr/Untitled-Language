@@ -177,6 +177,7 @@ interpretTExpr (TExpr typ expr) = interpretExpr expr
 interpretExpr :: InterpreterMonad m => ExprT Type TExpr -> m Value
 interpretExpr (LocalVar (DI name) id) = getValue $ DeBruijn id
 interpretExpr (Def name) = getValue $ Global name
+interpretExpr (Constructor name) = getValue $ Global name
 interpretExpr (Let name val vartyp body) =
   interpretTExpr val >>= flip withValue (interpretTExpr body)
 interpretExpr (IfThenElse cond thenE elseE) =
@@ -212,6 +213,7 @@ callFun _ _ =
 
 evaluateFun :: InterpreterMonad m => [Value] -> ExprT Type TExpr -> m Value
 evaluateFun args (Operator op) = evaluateOperator op args
+evaluateFun args (Constructor cons) = return $ VEnum cons [] args
 evaluateFun (arg:ctx) body = withValue arg $ evaluateFun ctx body
 evaluateFun [] body = interpretExpr body
 
