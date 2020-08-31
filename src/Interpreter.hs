@@ -219,6 +219,9 @@ callFun _ _ =
 
 evaluateFun :: InterpreterMonad m => [Value] -> ExprT Type TExpr -> m Value
 evaluateFun args (Operator op) = evaluateOperator op args
+evaluateFun args (Constructor "Array") = case args of
+  [VType typ, VInt i] -> return $ VType $ TArray typ (fromInteger i)
+  _ -> throwError $ InternalError "Array type constructor on wrong types"
 evaluateFun args (Constructor cons) = return $ VEnum cons [] args
 evaluateFun (arg:ctx) body = withValue arg $ evaluateFun ctx body
 evaluateFun [] body = interpretExpr body

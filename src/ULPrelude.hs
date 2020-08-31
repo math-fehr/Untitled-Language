@@ -29,6 +29,12 @@ true = TValue (VBool True) boolt
 false :: TValue
 false = TValue (VBool False) boolt
 
+array :: TValue
+array =
+  TValue
+    (VFun [] 2 (TExpr TBool $ Constructor "Array"))
+    (TUnrArrow TType (TUnrArrow intt TType)) -- HACK HACK HACK
+
 prelude :: TProgram
 prelude =
   M.fromList
@@ -37,4 +43,5 @@ prelude =
     , ("Int", int)
     , ("True", true)
     , ("False", false)
+    , ("Array", array)
     ]
