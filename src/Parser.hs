@@ -132,7 +132,6 @@ languageDef =
         , "forall"
         , "of"
         , "struct"
-        , "Type"
         ]
     , Token.reservedOpNames =
         [ "+"
@@ -203,7 +202,6 @@ expr3Parser :: Parser Expr
 expr3Parser =
   Parens <$> parens exprParser <|> varParser <|>
   IntConst . fromInteger <$> integer <|>
-  (reserved "Type" >> return EType) <|>
   arrayParser
 
 arrayParser :: Parser Expr
