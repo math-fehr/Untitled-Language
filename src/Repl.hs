@@ -111,6 +111,10 @@ displayValue (VTuple []) = "()"
 displayValue (VTuple (v1:vs)) =
   "(" ++
   foldl (\str v -> str ++ ", " ++ displayValue v) (displayValue v1) vs ++ ")"
+displayValue (VArray []) = "{}"
+displayValue (VArray (v1:vs)) =
+  "{" ++
+  foldl (\str v -> str ++ "; " ++ displayValue v) (displayValue v1) vs ++ "}"
 displayValue (VConstr name value) = name ++ " (" ++ displayValue value ++ ")"
 displayValue (VFun _ i _) = "<lambda#" ++ show i ++ ">"
 displayValue (VForall _ typ _) = "<forall : " ++ displayType typ ++ ">"

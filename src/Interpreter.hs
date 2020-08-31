@@ -229,6 +229,7 @@ makeOperatorClosure tp Gteq = binOp tp Gteq
 makeOperatorClosure tp Hat = unOp tp Hat
 makeOperatorClosure tp Ampersand = unOp tp Ampersand
 makeOperatorClosure tp Bar = unOp tp Bar
+makeOperatorClosure tp Array = unOp tp Array
 makeOperatorClosure tp Arrow = binOp tp Arrow
 makeOperatorClosure tp LinArrow = binOp tp LinArrow
 
@@ -288,6 +289,9 @@ evaluateOperator LinArrow [VType t1, VType t2] =
   return $ VType $ TLinArrow t1 t2
 evaluateOperator LinArrow _ =
   throwError $ TypeSystemUnsound "Invalid \"-@\" arguments"
+evaluateOperator Array [VTuple list] = return $ VArray list
+evaluateOperator Array _ =
+  throwError $ TypeSystemUnsound "Invalid array arguments"
 
 extractVInt :: InterpreterMonad m => String -> Value -> m Integer
 extractVInt _ (VInt i) = return i

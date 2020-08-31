@@ -45,6 +45,7 @@ data ManyOp
   | MBar
   | MHat
   | MComma
+  | MArray
   deriving (Ord, Show, Eq)
 
 str2manyOp :: String -> ManyOp
@@ -155,9 +156,11 @@ languageDef =
         , "{"
         , "}"
         , ";"
+        , "["
+        , "]"
         ]
-    , Token.opStart = oneOf "+-*/:&<>=^,{};"
-    , Token.opLetter = oneOf "+-*/:&<>=^,{};@"
+    , Token.opStart = oneOf "+-*/:&<>=^,{};[]"
+    , Token.opLetter = oneOf "+-*/:&<>=^,{};[]@"
     }
 
 lexer = Token.makeTokenParser languageDef
@@ -171,11 +174,17 @@ reservedOp = Token.reservedOp lexer
 
 parens = Token.parens lexer
 
+braces = Token.braces lexer
+
+brakets = Token.brackets lexer
+
 integer = Token.natural lexer
 
 semicolon = Token.semi lexer
 
 whiteSpace = Token.whiteSpace lexer
+
+sepSemi = Token.semiSep lexer
 
 varParser :: Parser Expr
 varParser = Var <$> identifier
@@ -194,11 +203,15 @@ expr3Parser :: Parser Expr
 expr3Parser =
   Parens <$> parens exprParser <|> varParser <|>
   IntConst . fromInteger <$> integer <|>
-  (reserved "Type" >> return EType)
+  (reserved "Type" >> return EType) <|>
+  arrayParser
+
+arrayParser :: Parser Expr
+arrayParser = braces $ ManyOp MArray <$> sepSemi exprParser
 
 -- | Parse expressions with precedence 2
 expr2Parser :: Parser Expr
-expr2Parser = (try callParser) <|> expr3Parser
+expr2Parser = try callParser <|> expr3Parser
 
 builtinBinOp :: String -> Parser (Expr -> Expr -> Expr)
 builtinBinOp op = reservedOp op >> return (BinOp $ str2binOp op)

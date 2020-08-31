@@ -582,6 +582,7 @@ typeExpr (Expr _ (Call (Expr _ (Operator Gteq)) arg)) = typeCallOp Gteq arg
 typeExpr (Expr _ (Call (Expr _ (Operator Gt)) arg)) = typeCallOp Gt arg
 typeExpr (Expr _ (Call (Expr _ (Operator Lt)) arg)) = typeCallOp Lt arg
 typeExpr (Expr _ (Call (Expr _ (Operator Lteq)) arg)) = typeCallOp Lteq arg
+typeExpr (Expr _ (Call (Expr _ (Operator Array)) arg)) = typeCallOp Array arg
 typeExpr (Expr _ (Call funE argE)) = do
   (tefun@(TExpr tfun _), fun_mtdt) <- typeExpr funE
   let called_mtdt = fun_mtdt & mtdt_interp %~ (\x -> x - 1)
@@ -661,6 +662,19 @@ typeCallOp op arg = do
              in return $ (, mtdt) $ TExpr (typeAfterCall funType) $
                 Call (TExpr funType (Operator op)) tearg
           _ -> throwError (ExpectedIntType arg targ)
+    Array ->
+      case targ of
+        TTuple (h:l) -> do
+          forM_ l asserth
+          return $ (, mtdt) $
+            TExpr array_type (Call (TExpr fun_type $ Operator Array) tearg)
+          where n = 1 + length l
+                asserth t = when (t /= h) $ throwError $ ArrayNotSameType h t
+                tuple_type = TTuple $ repeat h & take n
+                array_type = TArray h n
+                fun_type = TLinArrow tuple_type array_type
+        _ ->
+          throwError (InternalError "Array operator was applied to a non tuple")
 
 binopType :: Type -> Type
 binopType typ = TLinArrow typ (TLinArrow typ typ)

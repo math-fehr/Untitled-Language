@@ -49,7 +49,12 @@ binOpBuiltins =
 -- Manyary operations
 manyOpBuiltins :: Map ManyOp Operator
 manyOpBuiltins =
-  M.fromList [(MAmpersand, IR.Ampersand), (MBar, IR.Bar), (MHat, IR.Hat)]
+  M.fromList
+    [ (MAmpersand, IR.Ampersand)
+    , (MBar, IR.Bar)
+    , (MHat, IR.Hat)
+    , (MArray, IR.Array)
+    ]
 
 -- Get an expression from an identifier
 getExprFromIdent :: String -> PIRContext -> IR.Expr

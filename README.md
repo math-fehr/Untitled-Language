@@ -30,14 +30,14 @@ Let's discuss the core features:
 ## Uniform
 
 The language being Uniform means that everything is a value. integers are
-values, functions are values, types are value, modules are values. A makepair
+values, functions are values, types are value, modules are values. A `makepair`
 function can a build a pair of anything with anything. For now modules (similar
 to Ocaml) are only a planned features, but we already have first order-types.
 
 With first order types comes full-metaprogramming facilities. At compile-time
 types can be passed around and worked on like any other first-order value, like
 in Zig and Julia. Sentences like "The C++ type-system is Turing-complete" are
-unessessary because the type-system is manipulated with the language which is
+unnecessary because the type-system is manipulated with the language which is
 obviously Turing-complete. You can perfectly do:
 
 ```

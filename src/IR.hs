@@ -76,6 +76,7 @@ data Operator
   | Lt
   | Gteq
   | Lteq
+  | Array
   deriving (Show, Eq, Ord)
 
 -- | Type for concrete comptime values in the interpreter
@@ -87,6 +88,7 @@ data Value
   | VType Type
   | VStruct [(String, Value)]
   | VTuple [Value]
+  | VArray [Value]
   | VConstr String Value
   | VFun [Value] Int TExpr
   -- ^ The argument is at De Bruijn index 0 and the context in the list is above 0.

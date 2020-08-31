@@ -29,4 +29,5 @@ data Error
   | LastShouldBeType IR.Expr
   | NotEnoughArgs
   | TooManyArgs
+  | ArrayNotSameType Type Type
   deriving (Eq, Show)
