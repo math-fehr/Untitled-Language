@@ -123,6 +123,7 @@ languageDef =
         [ "let"
         , "in"
         , "def"
+        , "decl"
         , "fun"
         , "if"
         , "then"
