@@ -721,9 +721,7 @@ typeExprToType e = do
   case val of
     (VType val) -> return val
     _ ->
-      throwError $
-      InternalError
-        "interpreter didn't return a type when given an expression of type Type"
+      throwError $ ValueNotAType val
 
 getTypeFromEnum :: TypingMonad m => [(DebugInfo String, Expr)] -> m Type
 getTypeFromEnum [] = return TType
