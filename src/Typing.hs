@@ -199,6 +199,11 @@ collapseGStatus :: Maybe GlobalStatus -> GlobalStatus
 collapseGStatus Nothing = Undeclared
 collapseGStatus (Just s) = s
 
+interpretAndDef :: TypingMonad m => TExpr -> m TValue
+interpretAndDef te@(TExpr _ e) = do
+  forM_ (getDefsInTExpr e) defDecl
+  interpret te
+
 lookupVar ::
      TypingState
   -> Variable
@@ -529,7 +534,7 @@ defDecl name =
       DDef DefT {def_name, def_type, def_args, def_body} -> do
         expr <- desugarDef typ def_args def_body
         texpr <- fst <$> typeExprAndEval expr
-        interpret texpr
+        interpretAndDef texpr
       DEnum enum_name enum_args constructors -> 
         let n = length enum_args
         in if n == 0
@@ -591,7 +596,7 @@ typeExpr (Expr _ (Let (DI name) var vartyp body)) = do
       _ -> return tvar
   vval <-
     if mtdt ^. mtdt_interp < 0
-      then Just <$> extractVal <$> interpret tevar
+      then Just <$> extractVal <$> interpretAndDef tevar
       else return Nothing
   (tebody@(TExpr tbody _), body_mtdt) <- typeExpr body
   leaveScope
@@ -717,7 +722,7 @@ typeExprAndEval expr = do
   (typed_expr@(TExpr typ _), metadata) <- typeExpr expr
   result_expr <-
     if metadata ^. mtdt_comptime && metadata ^. mtdt_interp < 0
-      then TExpr typ <$> Value <$> interpret typed_expr
+      then TExpr typ <$> Value <$> interpretAndDef typed_expr
       else return typed_expr
   return (result_expr, metadata)
 
@@ -725,7 +730,7 @@ typeExprToType :: TypingMonad m => Expr -> m (Type)
 typeExprToType e = do
   te@(TExpr etyp _) <- fst <$> typeExpr e
   when (etyp /= TType) $ throwError $ NotAType e
-  (TValue val _) <- Typing.interpret te
+  (TValue val _) <- interpretAndDef te
   case val of
     (VType val) -> return val
     _ ->
