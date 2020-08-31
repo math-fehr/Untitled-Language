@@ -157,8 +157,9 @@ data DeclT typ expr
   | DEnum
       { ename :: String
       , eargs :: [(DebugInfo String, typ)]
-      , constructors :: [(String, typ)]
+      , constructors :: [String]
       }
+  | DConstr String typ
   | DStruct
       { sname :: String
       , fields :: [(String, typ)]

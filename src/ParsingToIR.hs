@@ -147,16 +147,16 @@ indTypToIr e1 [] ctx = do
     then return ([], ctx)
     else Left $ LastShouldBeType e1'
 
-indToIr :: PInductive -> PIRContext -> Either Error Decl
+indToIr :: PInductive -> PIRContext -> Either Error [Decl]
 indToIr (PInductive name typ args constrs) ctx = do
   (typ', ctx') <- indTypToIr typ args ctx
   constrs' <-
     mapM
       (\(c_name, typ) -> do
          typ' <- exprToIr typ ctx'
-         return (c_name, typ'))
+         return $ DConstr c_name typ')
       constrs
-  return $ DEnum name typ' constrs'
+  return $ DEnum name typ' (fmap (\(DConstr name _) -> name) constrs') : constrs'
 
 structToIr :: PStruct -> PIRContext -> Either Error Decl
 structToIr (PStruct name fields) ctx = do
@@ -168,14 +168,16 @@ structToIr (PStruct name fields) ctx = do
       fields
   return $ DStruct name fields'
 
-declToIr :: PDeclaration -> PIRContext -> Either Error Decl
-declToIr (DefDecl d) ctx = defToIr d ctx
+declToIr :: PDeclaration -> PIRContext -> Either Error [Decl]
+declToIr (DefDecl d) ctx = (: []) <$> defToIr d ctx
 declToIr (IndDecl d) ctx = indToIr d ctx
-declToIr (StructDecl s) ctx = structToIr s ctx
+declToIr (StructDecl s) ctx = (: []) <$> structToIr s ctx
 
 -- Parse a parsed program to an IR program
 parsedProgramToIr :: Parser.Program -> Either Error IR.Program
-parsedProgramToIr =
-  foldM
-    (\p' decl -> flip insertDeclaration p' <$> declToIr decl emptyCtx)
-    (IR.Program M.empty)
+parsedProgramToIr declarations =
+  decls >>= foldM
+                (\prog d -> return $ insertDeclaration d prog)
+                (IR.Program M.empty)
+ where decls :: Either Error [Decl]
+       decls = mconcat <$> forM declarations (flip declToIr emptyCtx)
