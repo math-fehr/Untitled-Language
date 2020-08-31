@@ -471,8 +471,7 @@ declDecl name =
   decl name $ \case
     DDef DefT {def_name, def_type, def_args, def_body} ->
       typeExprToType def_type
-    DEnum e_name e_args e_constructor ->
-      getTypeFromEnum e_args
+    DEnum e_name e_args e_constructor -> getTypeFromEnum e_args
     DConstr name typ -> do
       nt <- typeExprToType typ
       checkConstrType nt
@@ -511,7 +510,7 @@ desugarDef typ l body =
             (Expr SourcePos $
              ForAll h (Expr SourcePos $ Value $ TValue (VType arg) TType) body)
         _ -> throwError DeclarationFunctionTypeArgumentNumberMismatch
-  
+
 countArguments :: Type -> Int
 countArguments (TLinArrow _ t) = 1 + countArguments t
 countArguments (TUnrArrow _ t) = 1 + countArguments t
@@ -528,18 +527,22 @@ defDecl name =
         texpr@(TExpr found_typ _) <- fst <$> typeExprAndEval expr
         expectType typ def_body found_typ
         interpretAndDef texpr
-      DEnum enum_name enum_args constructors -> 
+      DEnum enum_name enum_args constructors ->
         let n = length enum_args
-        in if n == 0
+         in if n == 0
               then return $ TValue (VType $ TSum [] constructors) TType
-              else return $ flip TValue typ $ VForall [] (length enum_args) TType $ Expr SourcePos
-                          $ Value $ TValue (VType $ TSum [] constructors) TType
+              else return $ flip TValue typ $
+                   VForall [] (length enum_args) TType $
+                   Expr SourcePos $
+                   Value $
+                   TValue (VType $ TSum [] constructors) TType
       DConstr constr_name constr_type ->
         let n = countArguments typ
-        in if n == 0
+         in if n == 0
               then return $ flip TValue typ $ VEnum constr_name [] []
-              else return $ flip TValue typ $ VFun [] (countArguments typ)
-                          $ TExpr typ $ Constructor constr_name
+              else return $ flip TValue typ $ VFun [] (countArguments typ) $
+                   TExpr typ $
+                   Constructor constr_name
       _ -> throwError (InternalError "Struct decl unimplemented")
 
 typeVariable :: TypingMonad m => String -> Expr -> Variable -> m Type
@@ -620,6 +623,9 @@ typeExpr (Expr _ (Call (Expr _ (Operator Gt)) arg)) = typeCallOp Gt arg
 typeExpr (Expr _ (Call (Expr _ (Operator Lt)) arg)) = typeCallOp Lt arg
 typeExpr (Expr _ (Call (Expr _ (Operator Lteq)) arg)) = typeCallOp Lteq arg
 typeExpr (Expr _ (Call (Expr _ (Operator Array)) arg)) = typeCallOp Array arg
+typeExpr (Expr _ (Call (Expr _ (Operator Ampersand)) arg)) =
+  typeCallOp Ampersand arg
+typeExpr (Expr _ (Call (Expr _ (Operator Hat)) arg)) = typeCallOp Hat arg
 typeExpr (Expr _ (Call (Expr _ (Call (Expr _ (Operator Index)) index)) obj)) = do
   (teobj@(TExpr tobj vobj), mtdt) <- typeExpr obj
   case tobj of
@@ -698,7 +704,7 @@ typeExpr (Expr _ (Operator op)) =
 
 typeCallOp :: TypingMonad m => Operator -> Expr -> m (TExpr, MetaData)
 typeCallOp op arg = do
-  (tearg@(TExpr targ varg), mtdt) <- typeExpr arg
+  (tearg@(TExpr targ _), mtdt) <- typeExpr arg
   case op of
     _
       | op == Plus || op == Minus || op == Times || op == Div ->
@@ -730,11 +736,19 @@ typeCallOp op arg = do
             TExpr array_type (Call (TExpr fun_type $ Operator Array) tearg)
           where n = 1 + length l
                 asserth t = when (t /= h) $ throwError $ ArrayNotSameType h t
-                tuple_type = TTuple $ repeat h & take n
                 array_type = TArray h n
-                fun_type = TLinArrow tuple_type array_type
+                fun_type = TLinArrow targ array_type
         _ ->
           throwError (InternalError "Array operator was applied to a non tuple")
+    Ampersand ->
+      case targ of
+        TTuple typs -> do
+          forM_ typs asserttyp
+          return $ (, mtdt) $ TExpr TType $
+            Call (TExpr fun_type $ Operator Ampersand) tearg
+          where n = length typs
+                asserttyp t = when (t /= TType) $ throwError $ NotAType arg
+                fun_type = TLinArrow targ TType
 
 binopType :: Type -> Type
 binopType typ = TLinArrow typ (TLinArrow typ typ)
@@ -768,8 +782,7 @@ typeExprToType e = do
   (TValue val _) <- interpretAndDef te
   case val of
     (VType val) -> return val
-    _ ->
-      throwError $ ValueNotAType val
+    _ -> throwError $ ValueNotAType val
 
 getTypeFromEnum :: TypingMonad m => [(DebugInfo String, Expr)] -> m Type
 getTypeFromEnum [] = return TType
@@ -778,4 +791,3 @@ getTypeFromEnum ((_, e):es) = do
   addUnrestricted "_" e' Nothing
   es' <- getTypeFromEnum es
   return $ TForallArrow (DI "_") e' es'
-

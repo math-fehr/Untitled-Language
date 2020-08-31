@@ -63,7 +63,9 @@ executeCommand (CmdError (ParseError err)) =
   liftIO $ putStrLn $ "Error parsing command : " ++ show err
 executeCommand (CmdTopLevel decls) =
   lift $
-  catchError (forM_ decls action) (\e -> liftIO $ putStrLn $ "Couldn't define : " ++ show e)
+  catchError
+    (forM_ decls action)
+    (\e -> liftIO $ putStrLn $ "Couldn't define : " ++ show e)
   where
     action d = do
       Ty.registerDecl d
@@ -117,11 +119,15 @@ displayValue (VArray (v1:vs)) =
 displayValue (VFun _ i _) = "<lambda#" ++ show i ++ ">"
 displayValue (VForall _ _ _ _) = "<forall>"
 displayValue (VEnum constr _ []) = "[" ++ constr ++ "]"
-displayValue (VEnum constr _ (a1 : as)) = 
-    "[" ++ constr ++ " "
-    ++ foldl (\str a -> " (" ++ displayValue a ++ ")")
-             ("(" ++ displayValue a1 ++ ")") as
-    ++ "]\
+displayValue (VEnum constr _ (a1:as)) =
+  "[" ++
+  constr ++
+  " " ++
+  foldl
+    (\str a -> " (" ++ displayValue a ++ ")")
+    ("(" ++ displayValue a1 ++ ")")
+    as ++
+  "]\
        \"
 
 displayField :: (String, Value) -> String
@@ -145,8 +151,7 @@ displayType (TChoice (t1:ts)) =
   foldl (\str t -> str ++ " ^ " ++ displayType t) (displayType t1) ts ++ ")"
 displayType (TSum _ []) = "[|]"
 displayType (TSum _ (t1:ts)) =
-  "[ " ++
-  foldl (\str t -> str ++ " | " ++ t) t1 ts ++ " ]"
+  "[ " ++ foldl (\str t -> str ++ " | " ++ t) t1 ts ++ " ]"
 displayType (TStruct []) = "{&}"
 displayType (TStruct (t1:ts)) =
   "{ " ++

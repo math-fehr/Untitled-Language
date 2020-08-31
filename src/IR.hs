@@ -4,11 +4,11 @@
 module IR where
 
 import Control.Lens
+import Data.Foldable
 import qualified Data.Map as M
 import Data.Map (Map)
 import qualified Data.Set as S
 import Data.Set (Set)
-import Data.Foldable
 
 newtype DebugInfo a =
   DI a
@@ -202,7 +202,6 @@ insertDeclaration decl prog =
 getDeclaration :: String -> Program -> Decl
 getDeclaration ident p = prog_defs p M.! ident
 
-
 getDefsInTExpr :: ExprT Type TExpr -> Set String
 getDefsInTExpr (LocalVar _ _) = S.empty
 getDefsInTExpr (Def s) = S.singleton s
@@ -219,7 +218,6 @@ getDefsInTExpr (Tuple es) = fold (getDefsInTExpr <$> (\(TExpr _ e) -> e) <$> es)
 getDefsInTExpr (Lambda _ _ _ (TExpr _ body)) = getDefsInTExpr body
 getDefsInTExpr (ForAll _ _ (TExpr _ e)) = getDefsInTExpr e
 
-
 getDefsInExpr :: ExprT Expr Expr -> Set String
 getDefsInExpr (LocalVar _ _) = S.empty
 getDefsInExpr (Def s) = S.singleton s
@@ -235,9 +233,10 @@ getDefsInExpr (Call (Expr _ e1) (Expr _ e2)) =
   (getDefsInExpr e1) <> (getDefsInExpr e2)
 getDefsInExpr (Operator _) = S.empty
 getDefsInExpr (Tuple es) = fold (getDefsInExpr <$> (\(Expr _ e) -> e) <$> es)
-getDefsInExpr (Lambda _ _ (Expr _ typ) (Expr _ body)) = getDefsInExpr body <> getDefsInExpr typ
-getDefsInExpr (ForAll _ (Expr _ typ) (Expr _ e)) = getDefsInExpr typ <> getDefsInExpr e
-
+getDefsInExpr (Lambda _ _ (Expr _ typ) (Expr _ body)) =
+  getDefsInExpr body <> getDefsInExpr typ
+getDefsInExpr (ForAll _ (Expr _ typ) (Expr _ e)) =
+  getDefsInExpr typ <> getDefsInExpr e
 
 getDefsInValue :: Value -> Set String
 getDefsInValue VUnit = S.empty

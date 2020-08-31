@@ -97,9 +97,16 @@ exprToIr (BinOp binop e1 e2) ctx = do
 exprToIr (ManyOp MComma es) ctx =
   Expr SourcePos <$> Tuple <$>
   foldM (\lst e -> (: lst) <$> exprToIr e ctx) [] (reverse es)
+exprToIr (ManyOp MArray es) ctx -- HACK
+ = do
+  let op = manyOpBuiltins ! MArray
+  es' <- mapM (flip exprToIr ctx) es
+  return $
+    Expr SourcePos $
+    IR.Call (Expr SourcePos $ Operator op) (Expr SourcePos $ IR.Tuple es')
 exprToIr (ManyOp mop es) ctx = do
   let op = manyOpBuiltins ! mop
-  es' <- mapM (flip exprToIr ctx) es
+  es' <- mapM (flip exprToIr ctx) (reverse es) -- HACK
   return $
     Expr SourcePos $
     IR.Call (Expr SourcePos $ Operator op) (Expr SourcePos $ IR.Tuple es')
@@ -162,7 +169,8 @@ indToIr (PInductive name typ args constrs) ctx = do
          typ' <- exprToIr typ ctx'
          return $ DConstr c_name typ')
       constrs
-  return $ DEnum name typ' (fmap (\(DConstr name _) -> name) constrs') : constrs'
+  return $
+    DEnum name typ' (fmap (\(DConstr name _) -> name) constrs') : constrs'
 
 structToIr :: PStruct -> PIRContext -> Either Error Decl
 structToIr (PStruct name fields) ctx = do
@@ -182,8 +190,8 @@ declToIr (StructDecl s) ctx = (: []) <$> structToIr s ctx
 -- Parse a parsed program to an IR program
 parsedProgramToIr :: Parser.Program -> Either Error IR.Program
 parsedProgramToIr declarations =
-  decls >>= foldM
-                (\prog d -> return $ insertDeclaration d prog)
-                (IR.Program M.empty)
- where decls :: Either Error [Decl]
-       decls = mconcat <$> forM declarations (flip declToIr emptyCtx)
+  decls >>=
+  foldM (\prog d -> return $ insertDeclaration d prog) (IR.Program M.empty)
+  where
+    decls :: Either Error [Decl]
+    decls = mconcat <$> forM declarations (flip declToIr emptyCtx)
